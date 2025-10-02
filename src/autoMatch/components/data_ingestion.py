@@ -20,9 +20,6 @@ class DataIngestion:
         start_date = self.config.start_date
         end_date = self.config.end_date
 
-
-        print(start_date)
-        print(end_date)
         df = session.table(f"{database}.{schema}.{input_table}")
         df = df.select([col(c) for c in columns])
         df = df.filter((col("date_added") >= start_date) & (col("date_added") <= end_date))

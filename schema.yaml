@@ -11,6 +11,6 @@ data_ingestion:
 
 data_validation:  
     columns: 
-      date_added: date
-      candidateid: int64
-      description: str
+      date_added: timestamp
+      candidateid: long
+      description: str  

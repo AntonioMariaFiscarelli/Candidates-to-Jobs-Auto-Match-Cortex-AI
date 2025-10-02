@@ -12,3 +12,4 @@ data_validation:
   database: IT_DISCOVERY
   schema: CONSUMER_INT_MODEL
   input_table: MPG_IT_AUTOMATCH_CANDIDATE
+  STATUS_FILE: artifacts/data_validation/status.txt

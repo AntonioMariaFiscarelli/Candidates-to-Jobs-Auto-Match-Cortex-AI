@@ -2,7 +2,7 @@ from autoMatch.constants import *
 from autoMatch.utils.common import read_yaml, create_directories
 from autoMatch import logger
 
-from autoMatch.entity.config_entity import DataIngestionConfig
+from autoMatch.entity.config_entity import DataIngestionConfig, DataValidationConfig
 
 class ConfigurationManager:
     def __init__(
@@ -36,3 +36,21 @@ class ConfigurationManager:
         )
 
         return data_ingestion_config
+    
+
+    def get_data_validation_config(self) -> DataValidationConfig:
+        config = self.config.data_validation
+        schema = self.schema.data_validation
+
+        create_directories([config.root_dir])
+
+        data_validation_config = DataValidationConfig(
+            root_dir=config.root_dir,
+            database=config.database,
+            schema=config.schema,
+            input_table=config.input_table,
+            columns = schema.columns,
+            status_file = config.STATUS_FILE
+        )
+
+        return data_validation_config
