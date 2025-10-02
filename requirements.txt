@@ -1,0 +1,17 @@
+
+snowflake-snowpark-python==1.15.0
+
+dotenv
+notebook
+ipykernel
+pandas==2.1.4
+pyarrow==14.0.2
+snowflake-connector-python[pandas]==3.7.0
+
+python-box==6.0.2
+pyYAML
+tqdm
+ensure==1.0.2
+types-PyYAML
+
+-e .

@@ -1,0 +1,16 @@
+
+
+data_ingestion:  
+    columns: 
+      - date_added
+      - candidateid
+      - description
+    date_range:
+      start_date: 2025-07-01
+      end_date: 2025-07-31
+
+data_validation:  
+    columns: 
+      date_added: date
+      candidateid: int64
+      description: str

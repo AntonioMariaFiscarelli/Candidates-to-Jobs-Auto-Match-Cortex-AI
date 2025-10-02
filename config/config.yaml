@@ -1,0 +1,14 @@
+artifacts_root: artifacts
+
+data_ingestion:  
+  root_dir: artifacts/data_ingestion
+  database: IT_DISCOVERY
+  schema: CONSUMER_INT_MODEL
+  input_table: CANDIDATE_CLEANED
+  output_table: MPG_IT_AUTOMATCH_CANDIDATE
+
+data_validation:  
+  root_dir: artifacts/data_validation
+  database: IT_DISCOVERY
+  schema: CONSUMER_INT_MODEL
+  input_table: MPG_IT_AUTOMATCH_CANDIDATE
