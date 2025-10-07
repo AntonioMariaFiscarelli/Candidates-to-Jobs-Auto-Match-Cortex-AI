@@ -14,4 +14,6 @@ tqdm
 ensure==1.0.2
 types-PyYAML
 
+beautifulsoup4==4.12.2
+
 -e .

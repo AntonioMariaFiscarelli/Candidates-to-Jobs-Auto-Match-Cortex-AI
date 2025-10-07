@@ -13,3 +13,11 @@ data_validation:
   schema: CONSUMER_INT_MODEL
   input_table: MPG_IT_AUTOMATCH_CANDIDATE
   STATUS_FILE: artifacts/data_validation/status.txt
+
+data_transformation:  
+  root_dir: artifacts/data_transformation
+  database: IT_DISCOVERY
+  schema: CONSUMER_INT_MODEL
+  input_table: MPG_IT_AUTOMATCH_CANDIDATE
+  input_table_cleaned: MPG_IT_AUTOMATCH_CANDIDATE_CLEANED
+  output_table: MPG_IT_AUTOMATCH_CANDIDATE_FEATURES

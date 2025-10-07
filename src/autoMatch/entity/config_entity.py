@@ -20,3 +20,12 @@ class DataValidationConfig:
     input_table: str
     columns: dict
     status_file: str
+
+@dataclass(frozen=True)
+class DataTransformationConfig:
+    root_dir: str
+    database: str
+    schema: str
+    input_table: str
+    input_table_cleaned: str
+    output_table: str
