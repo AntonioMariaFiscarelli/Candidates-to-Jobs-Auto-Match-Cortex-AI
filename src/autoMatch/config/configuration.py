@@ -53,7 +53,7 @@ class ConfigurationManager:
             database=config.database,
             schema=config.schema,
             input_table=config.input_table,
-            columns = schema.columns,
+            table_schema=schema.table_schema,
             status_file = config.STATUS_FILE
         )
 

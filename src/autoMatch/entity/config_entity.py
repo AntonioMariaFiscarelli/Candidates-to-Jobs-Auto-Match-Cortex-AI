@@ -21,8 +21,8 @@ class DataValidationConfig:
     root_dir: str
     database: str
     schema: str
-    input_table: str
-    columns: dict
+    input_table: dict
+    table_schema: dict
     status_file: str
 
 @dataclass(frozen=True)

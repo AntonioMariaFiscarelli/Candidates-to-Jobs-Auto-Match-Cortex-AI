@@ -19,8 +19,19 @@ data_ingestion:
         - latitude
         - longitude
 
-data_validation:  
-    columns: 
-      date_added: timestamp
-      candidateid: long
-      description: str  
+data_validation:
+    table_schema:
+      candidates:  
+          columns: 
+            date_added: timestamp
+            candidateid: long
+            description: str  
+      italian_cities:  
+          columns:
+            unique_identifier: str
+            city_name: str
+            province: str
+            province_ext: str
+            zip: str
+            latitude: double
+            longitude: double

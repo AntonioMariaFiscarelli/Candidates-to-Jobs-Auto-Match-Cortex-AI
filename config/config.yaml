@@ -13,7 +13,9 @@ data_validation:
   root_dir: artifacts/data_validation
   database: IT_DISCOVERY
   schema: CONSUMER_INT_MODEL
-  input_table: MPG_IT_AUTOMATCH_CANDIDATE
+  input_table: 
+    candidates: MPG_IT_AUTOMATCH_CANDIDATE
+    italian_cities: MPG_IT_AUTOMATCH_ITALIAN_CITIES
   STATUS_FILE: artifacts/data_validation/status.txt
 
 data_transformation:  

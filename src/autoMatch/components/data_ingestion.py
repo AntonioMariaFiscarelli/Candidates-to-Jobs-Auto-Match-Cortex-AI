@@ -1,6 +1,8 @@
 from autoMatch import logger
 import pandas as pd
 from snowflake.snowpark.functions import col
+from snowflake.snowpark.types import StructType, StructField, StringType, FloatType
+from snowflake.snowpark import Row
 
 from autoMatch.entity.config_entity import DataIngestionConfig
 
@@ -40,7 +42,14 @@ class DataIngestion:
         df = pd.read_excel(italian_cities_file, header=0)
 
         # Rename columns for consistency (optional but recommended)
-        df.columns = [col.strip().replace(" ", "_").lower() for col in df.columns]
+        df.columns = (
+            df.columns
+            .str.strip()
+            .str.replace(" ", "_")
+            .str.replace('"', '')
+            .str.replace("'", '')
+            .str.lower()
+        )
         df = df[string_columns + numeric_columns]
         
         # Convert ZIP to string (preserve leading zeros)
@@ -54,12 +63,22 @@ class DataIngestion:
         for col in numeric_columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
+        #These are necessary in order to avoid columns names qith quotes (e.g. "city" instead of city)
+        rows = [Row(**row) for row in df.to_dict(orient="records")]
+        schema = StructType([
+            StructField("unique_identifier", StringType()),
+            StructField("city_name", StringType()),
+            StructField("province", StringType()),
+            StructField("province_ext", StringType()), 
+            StructField("zip", StringType()),
+            StructField("latitude", FloatType()),
+            StructField("longitude", FloatType())
+        ])
+
         logger.info(f"XLSX file containing italian cities successfully read")
-        print(df.head(3))
-        print(df.info())
 
-        return session.create_dataframe(df)
-
+        return session.create_dataframe(rows, schema=schema)
+    
     def write_table(self, df, table_name = 'output_table'):
         """
         Writes table
