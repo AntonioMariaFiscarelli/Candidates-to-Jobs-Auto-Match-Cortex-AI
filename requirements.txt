@@ -16,4 +16,6 @@ types-PyYAML
 
 beautifulsoup4==4.12.2
 
+streamlit==1.31.0
+
 -e .
