@@ -8,6 +8,16 @@ data_ingestion:
     date_range:
       start_date: 2025-07-01
       end_date: 2025-07-31
+    cities_file_columns:
+      string_columns:
+        - unique_identifier
+        - city_name
+        - province
+        - province_ext
+        - zip
+      numeric_columns:
+        - latitude
+        - longitude
 
 data_validation:  
     columns: 

@@ -6,6 +6,8 @@ data_ingestion:
   schema: CONSUMER_INT_MODEL
   input_table: CANDIDATE_CLEANED
   output_table: MPG_IT_AUTOMATCH_CANDIDATE
+  italian_cities_file: italian_cities/italian_cities.xlsx
+  output_table_italian_cities : MPG_IT_AUTOMATCH_ITALIAN_CITIES
 
 data_validation:  
   root_dir: artifacts/data_validation

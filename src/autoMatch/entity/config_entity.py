@@ -8,9 +8,13 @@ class DataIngestionConfig:
     schema: str
     input_table: str
     output_table: str
+    italian_cities_file: str
+    output_table_italian_cities: str
     columns: dict
     start_date: str
     end_date: str
+    italian_cities_string_columns: dict
+    italian_cities_numeric_columns: dict
 
 @dataclass(frozen=True)
 class DataValidationConfig:

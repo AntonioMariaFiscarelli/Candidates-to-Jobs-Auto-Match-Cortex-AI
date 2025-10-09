@@ -1,4 +1,5 @@
 from autoMatch import logger
+import pandas as pd
 from snowflake.snowpark.functions import col
 
 from autoMatch.entity.config_entity import DataIngestionConfig
@@ -27,15 +28,46 @@ class DataIngestion:
 
         return df
 
-
-    def write_table(self, session, df):
+    def read_cities_file(self, session):
         """
-        Writes input table
+        Reads XLSX file containing italian cities
+        Function returns Snowflake dataframe
+        """
+        italian_cities_file = self.config.italian_cities_file
+        string_columns = self.config.italian_cities_string_columns
+        numeric_columns = self.config.italian_cities_numeric_columns
+
+        df = pd.read_excel(italian_cities_file, header=0)
+
+        # Rename columns for consistency (optional but recommended)
+        df.columns = [col.strip().replace(" ", "_").lower() for col in df.columns]
+        df = df[string_columns + numeric_columns]
+        
+        # Convert ZIP to string (preserve leading zeros)
+        df["zip"] = df["zip"].apply(lambda x: str(int(x)) if pd.notnull(x) else None)
+        
+        # Convert string columns
+        for col in string_columns:
+            df[col] = df[col].astype(str).str.strip()
+
+        # Convert latitude and longitude to float, handle NaNs
+        for col in numeric_columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+        logger.info(f"XLSX file containing italian cities successfully read")
+        print(df.head(3))
+        print(df.info())
+
+        return session.create_dataframe(df)
+
+    def write_table(self, df, table_name = 'output_table'):
+        """
+        Writes table
         Function returns nothing
         """
-        output_table = self.config.output_table
 
-        df.write.save_as_table(output_table, mode="overwrite")
-        logger.info(f"Table {output_table} successfully written")
+        df.write.save_as_table(table_name, mode="overwrite")
+        logger.info(f"Table {table_name} successfully written")
 
   
+

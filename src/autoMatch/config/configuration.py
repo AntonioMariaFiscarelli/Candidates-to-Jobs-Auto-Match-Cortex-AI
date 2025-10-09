@@ -30,9 +30,13 @@ class ConfigurationManager:
             schema=config.schema,
             input_table=config.input_table,
             output_table = config.output_table,
+            italian_cities_file = config.italian_cities_file,
+            output_table_italian_cities = config.output_table_italian_cities,
             columns = schema.columns,
             start_date = schema.date_range.start_date,
-            end_date = schema.date_range.end_date
+            end_date = schema.date_range.end_date,
+            italian_cities_string_columns = schema.cities_file_columns.string_columns,
+            italian_cities_numeric_columns = schema.cities_file_columns.numeric_columns,
         )
 
         return data_ingestion_config
