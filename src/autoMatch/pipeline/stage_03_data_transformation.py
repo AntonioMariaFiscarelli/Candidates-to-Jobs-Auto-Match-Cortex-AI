@@ -15,11 +15,12 @@ class DataTransformationTrainingPipeline:
         config = ConfigurationManager()
         data_transformation_config = config.get_data_transformation_config()
         data_transformation = DataTransformation(config=data_transformation_config)
-        data_transformation.clean_description(session)
+        df = data_transformation.clean_description(session)
+        data_transformation.write_table(df, data_transformation.config.input_table_cleaned)
         df = data_transformation.apply_ner_cortexai(session)
-        data_transformation.write_table(session, df)
-
-
+        data_transformation.write_table(df, data_transformation.config.output_table)
+        df = data_transformation.add_geo_info(session)
+        data_transformation.write_table(df, data_transformation.config.output_table)
 
 
 if __name__ == '__main__':

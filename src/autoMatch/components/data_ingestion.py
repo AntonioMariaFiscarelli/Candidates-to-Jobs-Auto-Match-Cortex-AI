@@ -53,7 +53,7 @@ class DataIngestion:
         df = df[string_columns + numeric_columns]
         
         # Convert ZIP to string (preserve leading zeros)
-        df["zip"] = df["zip"].apply(lambda x: str(int(x)) if pd.notnull(x) else None)
+        df["zip"] = df["zip"].apply(lambda x: str(int(x)).zfill(5) if pd.notnull(x) else None)
         
         # Convert string columns
         for col in string_columns:
@@ -62,6 +62,14 @@ class DataIngestion:
         # Convert latitude and longitude to float, handle NaNs
         for col in numeric_columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
+
+        # Remove rows with missing city_name
+        df = df[
+            df["city_name"].notna() &  # Remove NaN and None
+            (df["city_name"].str.strip() != "") &  # Remove empty and whitespace-only strings
+            (df["city_name"].str.lower().str.strip() != "null") &  # Remove "NULL" string
+            (df["city_name"].str.lower().str.strip() != "nan")  # Remove "nan" string
+        ]
 
         #These are necessary in order to avoid columns names qith quotes (e.g. "city" instead of city)
         rows = [Row(**row) for row in df.to_dict(orient="records")]

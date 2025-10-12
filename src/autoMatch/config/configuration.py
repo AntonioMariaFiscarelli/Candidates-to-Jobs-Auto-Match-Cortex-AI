@@ -71,6 +71,7 @@ class ConfigurationManager:
             schema=config.schema,
             input_table=config.input_table,
             input_table_cleaned=config.input_table_cleaned,
+            input_table_italian_cities = config.input_table_italian_cities,
             output_table = config.output_table,
         )
 

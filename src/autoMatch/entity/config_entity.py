@@ -32,4 +32,5 @@ class DataTransformationConfig:
     schema: str
     input_table: str
     input_table_cleaned: str
+    input_table_italian_cities: str
     output_table: str
