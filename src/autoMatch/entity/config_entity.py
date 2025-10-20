@@ -34,3 +34,14 @@ class DataTransformationConfig:
     input_table_cleaned: str
     input_table_italian_cities: str
     output_table: str
+
+@dataclass(frozen=True)
+class SearchEngineConfig:
+    root_dir: str
+    database: str
+    schema: str
+    input_table: str
+    search_columns : dict
+    attributes_columns: dict
+    columns: dict
+    search_service: str

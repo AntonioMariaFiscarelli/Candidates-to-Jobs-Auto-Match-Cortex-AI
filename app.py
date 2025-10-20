@@ -25,7 +25,7 @@ def build_ai_prompt(role, location, age, skills, df_candidates):
     candidate_text = ""
     for _, row in df_candidates.iterrows():
         candidate_text += (
-            #f"ID:{row['candidateid']} | Età:{row['age']} | Location:{row['location']} | "
+            f"ID:{row['candidateid']} | Età:{row['age']} | Location:{row['location']} | "
             f"ID:{row['candidateid']} |"
             f"Ultimi lavori: {row['last_job']}, {row['second_last_job']}, {row['third_last_job']} | "
             f"Skills: {row['skills']}\n"

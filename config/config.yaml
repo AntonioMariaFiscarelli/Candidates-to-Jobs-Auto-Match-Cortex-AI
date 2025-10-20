@@ -26,3 +26,10 @@ data_transformation:
   input_table_cleaned: MPG_IT_AUTOMATCH_CANDIDATE_CLEANED
   input_table_italian_cities: MPG_IT_AUTOMATCH_ITALIAN_CITIES
   output_table: MPG_IT_AUTOMATCH_CANDIDATE_FEATURES
+
+search_engine:
+  root_dir: artifacts/search_engine
+  database: IT_DISCOVERY
+  schema: CONSUMER_INT_MODEL
+  input_table: MPG_IT_AUTOMATCH_CANDIDATE_FEATURES
+  search_service: CANDIDATE_SEARCH_SERVICE
