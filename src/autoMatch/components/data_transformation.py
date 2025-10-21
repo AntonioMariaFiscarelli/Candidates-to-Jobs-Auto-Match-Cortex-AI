@@ -4,6 +4,8 @@ from snowflake.snowpark.types import StringType, BooleanType
 from snowflake.snowpark.functions import udf
 from datetime import date
 
+from autoMatch.utils.common import validate_string
+
 from autoMatch.entity.config_entity import DataTransformationConfig
 
 
@@ -268,6 +270,11 @@ class DataTransformation:
         candidates = session.table(f"{database}.{schema}.{output_table}")
         italian_cities = session.table(f"{database}.{schema}.{input_table_italian_cities}")
 
+        # This avoids issues when the candidates table has already lat and long columns
+        candidates = candidates.select(
+            *[col(c) for c in candidates.columns if c.lower() not in {"latitude", "longitude", "province_ext"}]
+        )
+        
         valid_zips = [
             row[key]
             for row in italian_cities.select("zip").distinct().collect()
@@ -305,9 +312,12 @@ class DataTransformation:
         df = df.select(
             *[col(c.name) for c in candidates.schema.fields],
             col("latitude"),
-            col("longitude")
+            col("longitude"),
+            col("province_ext"),
             )
         
+        df = validate_string(df, "province_ext")
+
         # Regex for latitude: -90 to 90 with optional decimals
         latitude_regex = r"^[-+]?([0-8]?\d(\.\d+)?|90(\.0+)?)$"
         # Regex for longitude: -180 to 180 with optional decimals
@@ -327,6 +337,8 @@ class DataTransformation:
                 col("longitude").cast("FLOAT")
             ).otherwise(lit(None))
         )
+
+        df = df.with_column("distance_km", lit(999999))
 
         return df
 

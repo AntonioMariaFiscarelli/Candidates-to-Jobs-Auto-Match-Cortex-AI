@@ -45,10 +45,12 @@ search_engine:
       - skills
     attributes_columns:
       - age
+      - province_ext
     columns:
       - candidateid
       - age
       - location
+      - province_ext
       - last_job
       - second_last_job
       - third_last_job

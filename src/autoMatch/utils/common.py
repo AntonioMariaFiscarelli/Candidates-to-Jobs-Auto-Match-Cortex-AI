@@ -9,6 +9,7 @@ from box import ConfigBox
 from pathlib import Path
 from typing import Any
 
+from snowflake.snowpark.functions import col, trim, lower, when, lit, trim
 
 
 @ensure_annotations
@@ -124,3 +125,16 @@ def get_size(path: Path) -> str:
     """
     size_in_kb = round(os.path.getsize(path)/1024)
     return f"~ {size_in_kb} KB"
+
+
+def validate_string(df, column_name):
+    df = df.with_column(
+        column_name,
+        when(
+            (col(column_name).is_not_null()) &
+            (trim(col(column_name)) != "") &
+            (~lower(trim(col(column_name))).isin(["null", "none", "nan"])),
+            col(column_name)
+            ).otherwise(lit(None))
+        )
+    return df

@@ -11,10 +11,6 @@ from dotenv import load_dotenv
 
 
 # Constants
-DB = "cortex_search_tutorial_db"
-SCHEMA = "public"
-SERVICE = "airbnb_svc"
-BASE_TABLE = "cortex_search_tutorial_db.public.airbnb_listings"
 ARRAY_ATTRIBUTES = {"AMENITIES"}
 
 
@@ -38,25 +34,6 @@ def init_layout(search_engine):
     st.title("Cortex AI Search")
     st.markdown(f"Querying service: `{search_service}`".replace('"', ''))
 
-'''
-def query_cortex_search_service(query, filter={}):
-    """
-    Queries the cortex search service in the session state and returns a list of results
-    """
-    session = get_active_session()
-    cortex_search_service = (
-        Root(session)
-        .databases[DB]
-        .schemas[SCHEMA]
-        .cortex_search_services[SERVICE]
-    )
-    context_documents = cortex_search_service.search(
-        query,
-        columns=st.session_state.columns,
-        filter=filter,
-        limit=st.session_state.limit)
-    return context_documents.results
-'''
 
 """
 @st.cache_data
@@ -77,6 +54,19 @@ def init_search_input():
                                            placeholder="I'm looking for a Data Scientist with Python and SQL skills"
                                            )
 
+def init_location_input():
+    st.session_state.location = st.text_input("Province",
+                                           placeholder="Milano"
+                                           )
+def init_max_age_input():
+    st.session_state.max_age = st.number_input(
+        "Maximum age",
+        min_value=18,
+        #max_value=100,
+        value=40,
+        step=1
+    )
+                                   
 def init_limit_input():
     st.session_state.limit = st.number_input("Limit", min_value=1, value=5)
 
@@ -136,7 +126,9 @@ search_engine = SearchEngine(config=search_engine_config)
 
 init_layout(search_engine)
 get_column_specification(search_engine)
-#init_attribute_selection()
+
+init_location_input()
+init_max_age_input()
 init_limit_input()
 init_search_input()
 
@@ -145,13 +137,15 @@ init_search_input()
 #    filter = create_filter_object(st.session_state.attributes)
 #)
 
+
+
 if st.session_state.query:
     
     results = search_engine.query_cortex_search_service(session, 
                                                         query=st.session_state.query, 
-                                                        filter=search_engine.create_filter(40), 
-                                                        limit=5)
-        
+                                                        filter=search_engine.create_filter(st.session_state.max_age, st.session_state.location), 
+                                                        limit=st.session_state.limit)
+    
     display_search_results(results)
 
 

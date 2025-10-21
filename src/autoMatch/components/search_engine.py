@@ -46,11 +46,11 @@ class SearchEngine:
                 FROM {database}.{schema}.{input_table}
                 );
             """
-        
-        logger.info(f"Cortex search index {search_service} successfully defined on table {input_table}")
+        print(query)
 
         session.sql(query).collect()
-  
+        logger.info(f"Cortex search index {search_service} successfully defined on table {input_table}")
+
         
     def get_column_specification(self, session):
         """
@@ -102,23 +102,26 @@ class SearchEngine:
         
         return context_documents.results
     
-    def create_filter(self, max_age): #, skills):
+    def create_filter(self, max_age=None, province=None):
         """
         Create a filter object to include only candidates with:
-        - age <= max_age
-        - AND all specified skills present in the 'skills' string column
+        - age <= max_age (if provided)
+        - AND province_ext == province (if provided)
         """
         filter_clauses = []
 
-        # Age clause (directly append the valid @lte clause)
-        age_clause = { "@lte": { "age": max_age } }
-        filter_clauses.append(age_clause)
+        if max_age is not None:
+            age_clause = { "@lte": { "age": max_age } }
+            filter_clauses.append(age_clause)
 
-        # Skills clause: all skills must be present in the string
-        #skill_and_clauses = [{ "@contains": { "skills": skill } } for skill in skills]
-        #filter_clauses.extend(skill_and_clauses)
+        if province:
+            province_clause = { "@eq": { "province_ext": province } }
+            filter_clauses.append(province_clause)
 
-        return { "@and": filter_clauses }
-
+        # Return combined filter if any clauses exist
+        if filter_clauses:
+            return { "@and": filter_clauses }
+        else:
+            return {}
 
 
