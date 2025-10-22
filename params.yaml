@@ -1,1 +1,2 @@
-a: 0
+llm:
+  llm_name: mistral-large

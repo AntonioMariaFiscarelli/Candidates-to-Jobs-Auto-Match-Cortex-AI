@@ -45,3 +45,13 @@ class SearchEngineConfig:
     attributes_columns: dict
     columns: dict
     search_service: str
+
+@dataclass(frozen=True)
+class LLMConfig:
+    root_dir: str
+    database: str
+    schema: str
+    input_table: str
+    columns : dict
+    llm_name : str
+    columns: dict

@@ -55,3 +55,14 @@ search_engine:
       - second_last_job
       - third_last_job
       - skills
+
+
+llm:
+    columns:
+      candidateid: "ID"
+      age: "Eta"
+      location: "Location"
+      last_job: "Ultimo lavoro"
+      second_last_job: "Secondo ultimo lavoro"
+      third_last_job: "Terzo ultimo lavoro"
+      skills: "Skills"

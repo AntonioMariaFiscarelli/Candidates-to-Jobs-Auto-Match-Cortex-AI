@@ -33,3 +33,9 @@ search_engine:
   schema: CONSUMER_INT_MODEL
   input_table: MPG_IT_AUTOMATCH_CANDIDATE_FEATURES
   search_service: CANDIDATE_SEARCH_SERVICE
+
+llm:
+  root_dir: artifacts/llm
+  database: IT_DISCOVERY
+  schema: CONSUMER_INT_MODEL
+  input_table: MPG_IT_AUTOMATCH_CANDIDATE_FEATURES

@@ -9,6 +9,8 @@ from box import ConfigBox
 from pathlib import Path
 from typing import Any
 
+from snowflake.snowpark import functions as F
+
 from snowflake.snowpark.functions import col, trim, lower, when, lit, trim
 
 
@@ -138,3 +140,19 @@ def validate_string(df, column_name):
             ).otherwise(lit(None))
         )
     return df
+
+def haversine(lat_ref, lon_ref):
+    # --- Haversine distance calculation in Snowpark ---
+    lat1 = F.radians(F.lit(lat_ref))
+    lon1 = F.radians(F.lit(lon_ref))
+    lat2 = F.radians(F.col("LATITUDE"))
+    lon2 = F.radians(F.col("LONGITUDE"))
+
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+
+    a = F.sin(dlat / 2) * F.sin(dlat / 2) + F.cos(lat1) * F.cos(lat2) * F.sin(dlon / 2) * F.sin(dlon / 2)
+    c = 2 * F.asin(F.sqrt(a))
+    distance_km = 6371 * c  # Earth radius in km
+
+    return distance_km

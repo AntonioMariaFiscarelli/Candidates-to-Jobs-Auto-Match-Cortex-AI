@@ -2,7 +2,7 @@ from autoMatch.constants import *
 from autoMatch.utils.common import read_yaml, create_directories
 from autoMatch import logger
 
-from autoMatch.entity.config_entity import DataIngestionConfig, DataValidationConfig, DataTransformationConfig, SearchEngineConfig
+from autoMatch.entity.config_entity import DataIngestionConfig, DataValidationConfig, DataTransformationConfig, SearchEngineConfig, LLMConfig
 
 class ConfigurationManager:
     def __init__(
@@ -96,3 +96,23 @@ class ConfigurationManager:
         )
 
         return search_engine_config
+    
+
+    def get_llm_config(self) -> LLMConfig:
+        config = self.config.llm
+        schema = self.schema.llm
+        params = self.params.llm
+
+        create_directories([config.root_dir])
+
+        llm_config = LLMConfig(
+            root_dir=config.root_dir,
+            database=config.database,
+            schema=config.schema,
+            input_table=config.input_table,
+            llm_name=params.llm_name,
+            columns=schema.columns,
+
+        )
+
+        return llm_config
