@@ -36,7 +36,7 @@ try:
 except Exception as e:
     logger.exception(e)
     raise e
-
+'''
 
 STAGE_NAME = "Data Transformation stage"
 try:
@@ -48,7 +48,7 @@ except Exception as e:
    logger.exception(e)
    raise e
 
-
+'''
 STAGE_NAME = "Search Engine stage"
 try:
    logger.info(f">>>>>> stage {STAGE_NAME} started <<<<<<")
@@ -60,6 +60,7 @@ except Exception as e:
    raise e
 '''
 
+'''
 STAGE_NAME = "LLM stage"
 try:
    logger.info(f">>>>>> stage {STAGE_NAME} started <<<<<<")
@@ -69,3 +70,4 @@ try:
 except Exception as e:
    logger.exception(e)
    raise e
+'''

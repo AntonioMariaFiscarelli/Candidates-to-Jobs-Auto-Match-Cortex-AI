@@ -1,2 +1,2 @@
 llm:
-  llm_name: mistral-large
+  llm_name: claude-4-sonnet #mistral-large

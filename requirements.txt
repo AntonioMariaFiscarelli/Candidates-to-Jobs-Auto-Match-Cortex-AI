@@ -21,4 +21,6 @@ streamlit==1.31.0
 
 openpyxl
 
+groq
+
 -e .

@@ -1,11 +1,10 @@
 from autoMatch import logger
 import pandas as pd
-from snowflake.snowpark.functions import col
+from snowflake.snowpark.functions import col, dateadd, current_date, to_date, lit
 from snowflake.snowpark.types import StructType, StructField, StringType, FloatType
 from snowflake.snowpark import Row
 
 from autoMatch.entity.config_entity import DataIngestionConfig
-
 
 class DataIngestion:
     def __init__(self, config: DataIngestionConfig):
@@ -20,12 +19,15 @@ class DataIngestion:
         schema = self.config.schema
         input_table = self.config.input_table
         columns = self.config.columns
-        start_date = self.config.start_date
-        end_date = self.config.end_date
+        #start_date = self.config.start_date
+        #end_date = self.config.end_date
+        days_prior = self.config.days_prior
+
 
         df = session.table(f"{database}.{schema}.{input_table}")
         df = df.select([col(c) for c in columns])
-        df = df.filter((col("date_added") >= start_date) & (col("date_added") <= end_date))
+        #df = df.filter((col("date_added") >= start_date) & (col("date_added") <= end_date))
+        df = df.filter(col("date_added") >= dateadd("day", lit(-days_prior), current_date()))
         logger.info(f"Table {input_table} successfully read. Number of rows: {df.count()}")
 
         return df

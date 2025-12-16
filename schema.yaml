@@ -6,8 +6,9 @@ data_ingestion:
       - candidateid
       - description
     date_range:
-      start_date: 2025-07-01
-      end_date: 2025-07-31
+      days_prior: 30
+      start_date: 2025-10-01
+      end_date: 2025-12-12
     cities_file_columns:
       string_columns:
         - unique_identifier
@@ -36,6 +37,13 @@ data_validation:
             latitude: double
             longitude: double
 
+data_transformation:
+    education_levels:
+      - "Diploma scuola media"
+      - "Diploma scuola superiore"
+      - "Laurea triennale"
+      - "Laurea specialistica"
+      - "Dottorato"
   
 search_engine:
     search_columns: 
@@ -59,10 +67,1409 @@ search_engine:
 
 llm:
     columns:
-      candidateid: "ID"
-      age: "Eta"
-      location: "Location"
+      #candidateid: "ID"
+      #age: "Eta"
+      #location: "Location"
       last_job: "Ultimo lavoro"
       second_last_job: "Secondo ultimo lavoro"
       third_last_job: "Terzo ultimo lavoro"
       skills: "Skills"
+      languages: "Lingue"
+      education: "Titolo di studio"
+      certifications: "Certificazioni"
+    education_levels:
+      - "Diploma scuola media"
+      - "Diploma scuola superiore"
+      - "Laurea triennale"
+      - "Laurea specialistica"
+      - "Dottorato"
+    role_mappings:
+      acquisti:
+        - approvvigionamento
+        - buyer
+        - procurement
+        - purchasing specialist
+        - purchaser
+        - technical buyer
+        - gestione ordini
+        - riassortimento
+        - acquistore
+      responsabile_acquisti:
+        - senior buyer
+        - purchasing manager
+        - procurement manager
+        - material manager
+        - purchasing manager
+        - responsabile ufficio acquisti
+        - coordinator ufficio acquisti
+        - procurement supervisor
+        - project leader purchasing
+        - purchasing manager
+        - responsabile approvvigionamento
+      direttore_acquisti:
+        - purchasing director
+        - sourcing director
+        - sourcing manager
+        - supply chain director
+        - procurement director
+      agente_viaggi:
+        - tour operator
+        - booking
+      magazziniere:
+        - warehouse worker
+        - carico scarico
+      spedizioniere:
+        - traffico intermodale
+        - spedizioni aeree marittime
+        - internazionali doganali
+      responsabile_magazzino:
+        - capo magazzino
+        - distribution center manager
+        - inventory supervisor
+        - warehouse supervisor
+        - warehouse coordinator
+        - warehouse manager
+        - coordinatore di magazzino
+      avviatore:
+        - assemblatore
+        - installatore
+      collaudatore:
+        - collaudi
+        - controllista
+        - metrologo
+        - test process design
+        - test engineer
+        - commissioning engineer
+      cromatura:
+        - zincatore
+        - zincatura galvanica
+        - cromatore
+      formatura:
+        - prototyper
+        - prototipista
+        - maker
+        - modellatore 3d
+      magliaia:
+        - roccatura
+        - roccatrice
+        - rimagliatrice
+        - ritorcitura
+        - ritorcitrice
+      call_center:
+        - customer service
+        - operatore telefonico
+      carpenteria_leggera:
+        - carpentiere calderaio
+        - carpentiere edile
+      cassiere:
+        - cassa
+        - cassiera
+      compliance:
+        - risk management
+      addetto_confezionamento:
+        - addetto imbottigliamento
+      confezionatore_carta:
+        - fustellatore
+      controllo_accessi:
+        - security specialist
+        - guardia giurata
+        - safety specialist
+        - safety engineer
+        - security
+        - custode
+      regulatory_manager:
+        - controllo dimensionale
+        - ped
+        - control system
+        - QC
+      operaio_siderurgico:
+        - pressofusione
+        - operaio siderurgico
+        - fonderia
+        - manutenzione stampi
+        - foundry leader
+        - forni
+        - altoforno
+        - casting
+      gestione_appalti:
+        - ufficio gare
+      export_manager:
+        - ufficio estero
+        - ufficio spedizioni
+        - export area manager
+        - export assistant
+        - commerciale estero
+        - sales area manager
+      field_marketing:
+        - organizzazione eventi
+        - assistente marketing
+        - event coordinator
+        - marketing assistant
+        - trade marketing
+        - trade marketing manager
+      web_marketing:
+        - content media specialist
+        - digital web marketing specialist
+        - social media specialist
+        - digital media planner
+        - marketing analyst
+        - web analyst
+        - google analytics & site catalyst
+        - web copy write
+      responsabile_marketing:
+        - brand manager
+        - marketing manager
+        - digital media manager
+        - digital marketing manager
+        - digital media supervisor
+        - marketing coordinator
+        - social media manager
+        - web marketing manager
+      direttore_marketing:
+        - chief marketing officer
+        - Marketing director
+        - direttore creativo
+        - head of digital
+        - head of marketing
+        - CMO
+      responsabile_comunicazione:
+        - corporate communication
+        - pubbliche relazioni
+        - pr manager
+        - ufficio stampa
+        - comunication specialist
+        - pubblic relations manager
+      addetto_presse:
+        - stampaggio
+        - stampi
+        - stampatore
+        - presse ad iniezione
+        - presso piegatore
+      ricerca_e_selezione:
+        - hr assistant
+        - ufficio personale
+        - hr generalist
+        - recruitment business developer
+        - recruiter
+        - recruiting specialist
+        - recruitment consultant
+        - talent specialist
+        - hr specialist
+        - selezione del personale
+        - hr labour laws
+      direttore_del_personale:
+        - hr director
+        - hr manager
+        - Direttore risorse umane
+        - responsabile risorse umane
+        - hr business partner
+        - HRBP
+        - HR plant manager
+      sicurezza_alimenti:
+        - tecnologo alimentare
+        - food technologist
+        - analista alimentare
+        - haccp
+      manutentore_elettrico:
+        - electrical maintenance technician
+        - electrical maintenance engineer
+        - electrical field engineer
+        - electrical field technician
+      operatore_sala_quadri:
+        - elettrauto
+        - elettricista
+        - elettrotecnico
+        - quadrista
+      progettista_elettrico:
+        - electrical project engineer
+        - progettista elettronico
+        - electrical designer
+        - electrical engineer
+        - electrical specialist
+      sartoria:
+        - pelletteria
+        - macchine da cucire
+        - tagliatura
+        - taglia e cuci
+        - cucire
+        - cucito
+        - ricucire
+        - impuntura
+        - cucitura
+        - sarto
+        - sarta
+        - cucitrice
+        - bustaia
+        - rammendatrice
+        - confezione
+        - capospalla
+        - pantaloni
+        - sviluppo taglie
+        - modellista
+        - bustaia
+        - camiciaia
+        - campionarista
+        - alta moda
+        - campionarista
+      agente_di_commercio:
+        - monomandatario
+        - plurimandatario
+        - rappresentante
+        - procacciatore
+      commessa:
+        - addetto vendita
+        - show room
+        - showroom
+        - store assistant
+        - commessa
+        - responsabile showroom
+        - assistant store manager
+        - shop assistant
+      responsabile_punto_vendita:
+        - floor manager
+        - retail manager
+        - direttore negozio
+        - direttore punto vendita
+        - store manager
+        - responsabile negozio
+      operatore_macchine_cnc:
+        - alesatore
+        - fresatore
+        - attrezzista
+        - macchine taglio laser
+        - fresatore heidenhain
+        - tornitore controllo numerico
+        - programmatore cnc
+        - tornitore
+      addetto_servizi_generali:
+        - addetto gestione squadre
+        - addetto servizi
+        - addetto servizi e impianti
+        - addetto servizi generali
+        - addetto segreteria
+      addetto_macchine_automatiche:
+        - addetto alla produzione
+        - worker
+        - conduttore impianto
+      addetto_macchine_utensili:
+        - addetto taglio plasma
+        - operaio generico
+      amministratore_di_database:
+        - database developer
+        - database administrator
+        - dba
+        - SQL
+      amministratore_di_rete:
+        - network engineer
+        - network & security specialist
+        - system administrator
+        - network specialist
+        - certification authority specialist
+        - hosting specialist
+        - PEC specialist
+        - domini specialist
+        - cloud specialist
+        - data center specialist
+      analista_chimico:
+        - analitycal chemistry specialist
+        - formulation chemist
+        - chemical laboratory analyst
+        - responsabile laboratorio chimico
+        - supervisore di laboratorio
+        - tecnico chimico
+        - analista laboratorio
+      programmatore_mobile_app:
+        - mobile developer
+        - programmatore mobile
+        - ios developer
+        - sviluppatore ios
+        - android developer
+        - sviluppatore android
+        - sviluppatore app
+      net_programmer:
+        - .net developer
+        - programmatore.net
+        - sviluppatore .net
+      cpp_programmer:
+        - Cpp developer
+        - programmatore cpp
+        - sviluppatore cpp
+      c_sharp_programmer:
+        - C sharp developer
+        - programmatore c sharp
+        - sviluppatore c sharp
+      php_programmer:
+        - Php developer
+        - programmatore php
+        - sviluppatore php
+      web_programmer:
+        - Web developer
+        - programmatore web
+        - sviluppatore web
+        - HTML
+        - HTML5
+        - web designer
+        - css developer
+      java_programmer:
+        - Java developer
+        - programmatore java
+        - sviluppatorejava
+        - j2ee developer
+        - javascript developer
+      progettista_fw:
+        - firmware
+        - fw engineer
+        - fw developer
+        - sviluppatore fw
+        - fw designer
+      analista_funzionale:
+        - application manager
+        - application specialist
+        - business analyst
+        - analista tecnico funzionale
+      analista_programmatore:
+        - ingegnere informatico
+        - sviluppatore software
+        - sw developer
+        - responsabile sviluppo sw
+        - sviluppatore frontend
+        - sviluppatore sw
+        - sw designer
+        - sw engineer
+        - analista applicativo
+        - analista sviluppatore
+        - analyst developer
+        - application analyst
+        - application developer
+        - developer
+        - progettista software
+        - programmatore
+        - software developer
+        - software engineer
+        - sviluppatore
+      data_scientist:
+        - BI analyst
+        - datawarehouse developer
+        - Business Intelligence
+        - Machine Learning
+        - Big data
+      animatore:
+        - intrattenitore
+        - performer
+      architetto:
+        - Arredatore
+        - architettonico
+        - architettura
+        - interior designer
+        - architect
+      assemblatore_elettrico:
+        - Assemblatore schede elettroniche
+      archivista:
+        - data entry
+        - archiviazione documentale
+      tecnico_meccatronico:
+        - assemblaggio
+        - montatore meccanico
+      avvocato:
+        - penalista
+        - giurista
+        - legale
+        - avvocatura
+        - civilista
+        - divorzista
+        - affari legali
+        - paralegal
+      commercialista:
+        - dichiarazioni fiscali
+        - studio professionale
+        - studio commercialisti
+        - tax consultant
+        - fiscalista
+      addetto_amministrativo:
+        - Contabile
+        - contabilità clienti
+        - amministrativo
+        - accounts receivable
+        - accounts payable
+        - contabilità generale
+        - contabilità fornitori
+        - accountant
+      payroll_specialist:
+        - paghe e contributi
+        - payroll team leader
+        - consulente del lavoro
+        - amministrazione personale
+        - hr administration specialist
+        - addetto buste paga
+      assistente_direzione:
+        - executive assistant
+        - segretaria di direzione
+      ingegnere_qualita:
+        - quality engineer
+        - quality specialist
+        - inspector
+        - auditor
+        - addetto qualità
+      autista:
+        - autotrasportatore
+        - autotrasporto
+        - padroncino
+        - trasportatore
+        - driver
+        - camionista
+        - guidatore
+        - guidare
+      baby_sitter:
+        - puericultrice
+        - tata
+      credit_collector:
+        - recupero crediti
+        - credit specialist
+        - credit analyst
+        - phone collector
+        - factoring
+      promotore_finanziario:
+        - mediatore creditizio
+        - private banker
+      credit_manager:
+        - account receivable manager
+        - responsabile crediti
+      risk_analyst:
+        - credit controller
+        - risk consultant
+        - credit manager
+      gestore_top:
+        - Premium
+        - titoli
+        - affluent
+        - benestanti
+      gestore_small_business:
+        - fidi
+        - crediti
+        - imprese
+        - aziende
+      gestore_large_corporate:
+        - Gestore corporate
+        - gestore mid corporate
+      wealth_relationship_manager:
+        - Relationship manager
+      responsabile_di_filiale:
+        - Direttore di filiale
+        - branch manager
+      capo_mercato:
+        - District manager
+        - area manager
+      responsabile_centro_corporate:
+        - Direttore centro imprese
+      trade_manager_territoriale:
+        - Trade Manager
+        - Responsabile Trade
+      corporate_analyst:
+        - Analista centro corporate
+        - analista centro imprese
+      esperto_merito_creditizio:
+        - Analisti fidi
+        - esperto analisi merito del credito
+      gestore_ristrutturazione_debito:
+        - crediti deteriorati
+        - gestore restructuring
+      gestore_NPL:
+        - Gestore NPL
+      analista_NPL:
+        - Analista NPL
+      esperto_relazioni_banca_d_italia:
+        - Esperto segnalazioni di vigilanza
+      analista_credito_al_consumo:
+        - Analista cessione del quinto
+      real_estate_relationship_manager:
+        - Real estate
+        - assett allocation
+      cash_flow_analyst:
+        - Analista cash flow
+        - gestore cash flow
+      capo_reparto_gdo:
+        - Area manager freschi
+        - capo reparto gastronomia
+        - capo reparto gdo panetteria
+        - capo reparto gdo pasticceria
+        - capo reparto macelleria
+      promoter_alimentare:
+        - gastronomia
+        - banco
+        - gastronomo
+        - banchista
+        - taglio peso
+        - banconista
+      barista:
+        - barman
+      caldaista:
+        - addetto utilities
+      cameriere:
+        - runner di ristorante
+        - addetto sala ristorante
+        - cameriere di sala
+        - commis di sala
+        - maitre
+      chef:
+        - commis di cucina
+        - cuoco
+        - chef de partie
+        - chef de rang
+        - chef dimostratore
+        - executive chef
+      cantiniere:
+        - sommelier
+        - capo cantina
+        - enologo
+      capocantiere:
+        - coordiantore lavori
+        - direttore di cantiere
+        - geometra
+        - planner di cantiere
+        - responsabile cantiere
+        - site manager
+      caporeparto:
+        - shift leader
+        - shift supervisor
+        - manufacturing manager
+        - production team leader
+        - production coordinator
+        - coordinatore produzione
+        - capo settore
+        - capo squadra
+        - responsabile reparto
+        - capo turno
+      responsabile_produzione:
+        - production manager
+        - plant manager
+        - responsabile stabilimento
+        - manufacturing manager
+      direttore_stabilimento:
+        - manufacturing director
+        - production director
+        - direttore produzione
+        - vice direttore stabilimento
+        - plant director
+        - production director
+        - operations director
+        - direttore operations
+        - operations manager
+        - direttore operativo
+        - direttore industriale
+      responsabile_manutenzione:
+        - capo manutenzione
+        - coordinatore manutenzione
+        - maintenance manager
+        - maintenance coordinator
+        - tpm manager
+        - head of maintenance
+      centralino:
+        - centralinista
+        - reception
+        - segreteria
+        - receptionist
+      carrellista:
+        - mulettista
+        - muletto
+      direttore_amministrativo:
+        - cfo
+        - chief financial officer
+        - direttore finanziario
+        - finance manager
+        - responsabile amministrazione finanze e controllo
+        - responsabile amministrativo
+      capo_contabile:
+        - accounting supervisor
+        - reporting e bilancio
+        - finance manager
+        - chief accountant
+        - responsabile amministrativo
+      contabilita_industriale:
+        - controllo di gestione
+        - reporting specialist
+        - consolidation controller
+        - reporting specialist
+        - financial controller
+        - controller
+        - controllo di gestione
+        - cost controller
+        - industrial controller
+        - business controller
+        - group controller
+        - business analyst
+      finance_consolidation_manager:
+        - Responsabile bilancio consolidato
+        - General Accounting Manager
+        - Reporting Manager
+        - Accounting & Consolidation
+        - financial reporting
+        - Group Consolidation
+      market_and_sales_analyst:
+        - Market Research Manager
+        - Researcher
+        - market analyst
+        - market controller
+        - Market & Strategy Analyst
+        - Sales & Marketing Controller
+      consulente_formativo:
+        - Responsabile formazione
+        - training manager
+        - training consultant
+      hse_manager:
+        - Environmental manager
+        - health environment manager
+        - safety environment manager
+        - hse
+        - responsabile prevenzione
+        - head of hse
+        - rspp
+        - aspp
+        - responsabile626
+        - responsabile sicurezza
+        - consulente sicurezza
+        - responsabile ambiente e sicurezza
+      country_manager:
+        - direttore generale
+        - ceo
+        - chief executive officer
+        - general manager
+      customer_care:
+        - after sales engineer
+        - contact center
+        - post vendita
+        - tecnico post-vendita
+        - assistenza clienti
+        - servizio clienti
+        - customer care
+        - customer interface
+        - after sales specialist
+        - service account
+        - service support
+        - coordinator assistenza
+        - field service engineer
+        - support engineer
+        - post vendita
+        - assistenza tecnica
+      service_manager:
+        - customer service manager
+        - warranty manager
+        - technical service manager
+        - technical assistance
+      direttore_assistenza_tecnica:
+        - customer service director
+        - responsabile assistenza tecnica
+        - technical support manager
+        - after sales director
+        - after sales manager
+      decoratore:
+        - decoratrice
+      model_maker:
+        - alias modeler
+        - die casting tool engineer
+      fashion_designer:
+        - progettista di accessori
+        - stilista
+      direttore_commerciale:
+        - direttore commerciale
+        - sales director
+        - direttore vendite
+        - head of business unit
+        - vp sales
+      direttore_logistica:
+        - plant logistic manager
+        - responsabile logistica
+        - logistic manager
+        - logistic director
+        - supply chain manager
+      logistic_engineer:
+        - supply chain
+        - logistica
+        - logistic expert
+        - pianificazione
+        - planner
+        - material planner
+      responsabile_pianificazione_produzione:
+        - production planner
+        - MRP
+        - pianificazione produzione
+        - programmazione produzione
+        - production planning manager
+      lean_manufacturing_manager:
+        - lean six sigma
+        - lean manager
+        - lean manufacturing
+        - lean production manager
+        - wcm manager
+        - operation excellence
+        - TPS
+        - continuous improvement manager
+        - ci manager
+      tecnico_controllo_qualita:
+        - controllo qualità
+        - ufficio omologazione
+        - coordinatore controllo qualità
+        - ispettore ndt
+        - ispettore qualità
+      progettista_meccanico:
+        - progettista
+        - mechanical engineer
+        - disegnatore meccanico
+        - mechanical designer
+        - project engineer
+      disponente_viaggi:
+        - traffico nazionale
+        - ufficio viaggi
+        - trasporti
+        - travel counselor
+      elettromeccanico:
+        - meccatronico
+        - mechatronic
+      estetista:
+        - beauty consultant
+        - make up artist
+        - visagista
+      factotum:
+        - governante
+        - domestico
+        - maggiordomo
+        - housekeeper
+      farmacista:
+        - parafarmacista
+        - pharmacist
+        - druggist
+        - healthcare professional
+      formatore:
+        - instructor
+        - trainer
+        - training specialist
+      venditore:
+        - key account
+        - business developer
+        - commerciale
+        - sales assistant
+        - sales associate
+        - key account manager
+        - KAM
+      grafico:
+        - fotoritocco
+        - grafico pubblicitario
+        - grafico web
+        - graphic designer
+      helpdesk:
+        - support specialist
+        - it specialist
+        - support desk
+      tecnico_hardware:
+        - hardware project engineer
+        - hw design engineer
+        - it architect
+        - tecnico assistenza
+        - tecnico informatico
+      hostess:
+        - assistente di bordo
+        - assistente di volo
+        - congressi
+        - congressuale
+        - accompagnatrice
+        - guida
+        - accoglienza
+        - ospitality
+      impiantista:
+        - tecnico impianti
+      gemme:
+        - gioielliere
+        - gemmologo
+      impiegato_commerciale:
+        - ordini clienti
+        - portafogli
+        - licensing
+        - proposal
+        - gare d'appalto
+        - backoffice commerciale
+      informatore_medico_scientifico:
+        - disease awareness liaison
+        - informatore medico
+        - informatore scientifico
+        - informatore scientifico del farmaco
+        - product specialist pharma
+      ingegnere_di_laboratorio:
+        - laboratory engineer
+        - laboratory specialist
+      ingegnere_biomedico:
+        - sistemi medicali
+        - biomedical engineer
+      insegnante:
+        - istruttore
+        - teacher
+      lamierista:
+        - taglio lamiera laser
+        - piegatura lamiera
+        - laminatore
+      macellaio:
+        - mattatoio
+        - macello
+        - disossatore
+      manutentore:
+        - field service
+        - maintenance
+        - tpm
+        - manutenzione
+        - filed engineer
+        - service engineer
+      merchandiser:
+        - promozione
+        - promotore
+      modella:
+        - mannequin
+        - top model
+        - indossatrice
+        - escort
+      montatore_calzaturiero:
+        - aggiuntatrice
+        - aggiunteria
+        - premontista
+      montatore:
+        - mobiliere
+        - stand
+        - mobili
+      montatore_orafo:
+        - montatore orafo
+      motorista:
+        - calibration engineer
+      muratore:
+        - manovale
+      operaio_agricolo:
+        - agronomo
+        - agricoltore
+        - agricoltura
+        - zootecnico
+      oss:
+        - infermiere professionale
+        - operatore oss
+        - operatore socio sanitario
+      product_manager:
+        - product specialist
+        - product engineer
+      electronic_engineer:
+        - electronic designer
+        - hardware designer
+        - firmware designer
+        - hardware engineer
+        - power electronic designer
+        - power electronic engineer
+        - progettista pcb
+        - fpga
+      celle_solari:
+        - rinnovabili
+        - fotovoltaico
+      programmatore_plc:
+        - progettista plc
+        - automation engineer
+        - hmi engineer
+      project_manager:
+        - PMO
+        - project management officer
+        - capo progetto
+        - program manager
+        - responsabile progetto
+        - head of project management
+        - project director
+      responsabile_edp:
+        - Responsabile it
+        - it manager
+      direttore_sistemi_informativi:
+        - Direttore IT
+        - IT director
+        - cio
+        - chief information officer
+      responsabile_industrializzazione:
+        - industrialization engineer
+        - technology manager
+        - equipment engineer
+        - engineering manager
+        - engineering director
+      responsabile_laboratorio:
+        - head of lab
+        - head of laboratory
+      responsabile_progettazione:
+        - coordinatore ufficio tecnico
+        - responsabile sviluppo prodotto
+        - responsabile ufficio tecnico
+        - technical manager
+        - responsabile tecnico
+        - product development manager
+        - product development director
+      direttore_tecnico:
+        - responsabile r&d
+        - responsabile ricerca sviluppo
+        - r&d manager
+        - responsabile ricerca e sviluppo
+        - direttore r&d
+        - r&d director
+        - technical director
+      responsabile_qualita:
+        - direttore qualità
+        - responsabile certificazione
+        - system & process quality engineer
+        - quality director
+        - quality manager
+      process_engineer:
+        - ingegnere di processo
+        - ingegnere tempi metodi
+        - compliance specialist
+        - process development engineer
+        - responsabile tecnologia processi
+        - tecnologo processi
+        - manufacturing engineer
+        - tecnico manualistica
+        - tecnologo di processo
+        - process technologist
+        - lean engineer
+      responsaile_commerciale:
+        - responsabile vendite
+        - business development manager
+        - BDM
+        - ispettore vendite
+        - sales manager
+        - responsabile vendite
+        - area manager
+        - responsabile ufficio vendite
+        - national account
+      tecnico_commerciale:
+        - sales representative
+        - tecnico commerciale
+        - account manager
+        - sviluppo commerciale
+        - funzionario commerciale
+        - inside sales
+        - sales account
+        - sales engineer
+      rettificatore:
+        - r3
+        - rettifiche
+      revisore:
+        - compliance management
+        - audit
+        - auditor
+      ricercatore:
+        - researcher
+        - ingegnere r&d
+        - innovation specialist
+        - r&d assistant
+      saldatore:
+        - saldatura laser
+        - saldatore a elettrodo
+        - saldatore su acciaio inox
+        - saldatore tig
+        - saldocarpentiere
+      sap_analyst:
+        - consulente SAP
+        - Hana
+        - SAP specialist
+        - Business One Specialist
+      sbavatore:
+        - sbavatura
+      strumentista:
+        - instrument technician
+        - collaudatore elettronico
+        - commissioning
+        - installatore elettronico
+        - instrument engineer
+      tecnico_di_laboratorio:
+        - tecnico laboratorio
+        - assistente laboratorio
+        - analista di laboratorio
+        - lab technician
+        - laboratory technician
+      analista_organizzazione:
+        - analista di organizzazione e processi
+        - organization specialist
+        - hr specialist
+      assicuratore:
+        - assicurativo
+        - polizze
+        - assicurazione
+        - insurance agent
+        - broker assicurativo
+        - insurance manager
+      head_of_legal:
+        - Legal counsel
+        - General Counsel
+        - responsabile affari legali
+        - Legal and Corporate Affairs
+        - ufficio legale
+        - consulente legale
+      segretaria_operativa:
+        - Segretaria commerciale
+        - segretaria amministrativa commerciale
+      segretaria_ufficio_legale:
+        - ufficio appalti
+      segretario_di_ricevimento:
+        - capo ricevimento
+        - portiere di notte
+      sistemista:
+        - sistemista
+        - system engineer
+        - networking
+        - system & network administrator
+      flessografico:
+        - grafico stampatore
+      telemarketing:
+        - direct marketing
+        - teleseller
+        - telesales
+      tesoriere:
+        - tesoreria e finanza
+        - corporate treasury specialist
+        - responsabile tesoreria
+        - treasury manager
+      tessitore:
+        - telaio
+        - tessile
+        - taglio tessuti
+        - incettatrice
+        - infilatrice tessuti
+        - maestra di rammendo
+        - capo tessile
+        - ricamatrice
+      traduttore:
+        - translator
+        - interprete
+      verniciatore:
+        - verniciatura
+        - caporeparto verniciatura
+        - verniciatore a spruzzo
+      web_administrator:
+        - google platform specialist
+        - SEO
+        - SEM
+        - web manager
+        - webmaster
+      supervisor:
+        - responsabile
+        - coordinatore
+        - manager
+      content_manager:
+        - social media specialist
+        - social media manager
+        - digital content manager
+        - community manager
+        - community specialist
+        - web copy writer
+      seo_manager:
+        - SEO specialist
+        - search engine optimization
+      digital_media_planner:
+        - digital media manager
+        - digital media supervisor
+        - display advertising manager
+        - digital strategic planner
+      user_acquisition_manager:
+        - SEM manager
+        - SEM specialist
+        - digital performance manager
+        - traffic acquisition manager
+        - traffic acquisition specialist
+        - user acquisition specialist
+        - ecommerce marketing manager
+        - digital advertising manager
+        - affiliation manager
+        - Adwords specialist
+        - affiliate marketing manager
+      digital_marketing_manager:
+        - digital media analyst
+        - media analyst
+        - web analyst
+        - google analytics & site catalyst
+        - ROI analyst
+        - head of analytics
+        - Data analyst
+        - data scientist
+        - DMP
+        - data management web marketing
+      ecommerce_manager:
+        - online store manager
+        - ecommerce operation manager
+        - ecommerce merchandiser
+        - ecommerce marketing manager
+        - ecommerce director
+        - head of ecommerce
+        - ecommerce buyer
+        - ecommerce communication manager
+      chief_innovation_officer:
+        - head of digital
+        - chief digital officer
+      user_experience_manager:
+        - user experience designer
+        - UX manager
+        - UI manager
+        - User interface designer
+        - CXO
+        - chief experience officer
+        - chief interaction officer
+        - service design
+        - head of service design
+        - internet of things
+        - IOT
+        - user experience designer
+        - digital art director
+        - digital designer
+        - digital creative director
+        - digital creative manager
+        - direttore creativo digitale
+      direttore_creativo_digitale:
+        - user experience manager
+        - digital art director
+        - digital designer
+        - digital creative director
+        - digital creative manager
+      adv_sales:
+        - sales manager centri media
+        - sales manager clienti diretti
+        - digital advertising sales manager
+        - adv sales manager
+      partner_digitali:
+        - publisher manager
+        - digital publisher manager
+      RTB:
+        - programmatic manager
+        - head of programmatic
+        - programmatic specialist
+        - real time bidding
+      head_of_ad_operation:
+        - Ad Operation manager
+        - Ad Operation
+        - trafficker
+        - traffic manager
+        - Ad ops
+        - head of Ad ops
+      mobile_advertising:
+        - digital CRM manager
+        - digital CRM specialist
+        - email marketing manager
+        - customer retention
+        - loyalty
+        - fidelizzazione
+        - head of CRM
+        - retention mobile manager
+        - mobile marketing manager
+      responsabile_marketing_duplicate:
+        - Brand manager
+        - marketing manager
+        - marketing coordinator
+      direttore_marketing_duplicate:
+        - chief marketing officer
+        - Marketing director
+        - direttore creativo
+        - head of marketing
+        - CMO
+      medico_di_prodotto:
+        - Medical advisor
+        - medical adviser
+        - medical affairs
+      MSM:
+        - Medical liaison
+        - medical science liaison
+        - MSL field medical advisor
+        - medical science manager
+      medical_lead:
+        - Medical manager
+        - therapeutic area head
+        - responsabile di area terapeutica
+      regulatory_affairs_director:
+        - Regulatory affairs manager
+      affari_regolatori:
+        - Regulatory affairs associate
+        - regulatory affairs officer
+        - regulatory affairs supervisor
+        - regulatory affairs specialist
+      quality_assurance_supervisor:
+        - Quality Assurance Manager
+        - Quality Assurance Specialist
+        - QA
+        - assicurazione qualità
+      quality_control_specialist:
+        - Quality Control Manager
+        - Quality Control Supervisor
+        - Quality Control Analyst
+        - QC
+        - controllo qualità
+      ISF:
+        - Product Specialist
+        - Informatore Scientifico del Farmaco
+      regional_account_manager:
+        - Field Market Access
+        - Regional Affairs Manager
+      SFE_Specialist:
+        - Sales Force Effectiveness Specialist
+      CRA:
+        - Clinical Research Associate
+      Clinical_Trial_Manager:
+        - Clinical Research Manager
+        - Clinical Team Manager
+        - Clinical Team Leader
+      Clinical_Application_Specialist:
+        - Field Application Specialist
+      Drug_Safety_Manager:
+        - Pharmacovigilance officer
+        - Pharmacovigilance Manager
+        - Pharmacovigilance Specialist
+        - Drug Safety Officer
+        - Drug Safety Specialist
+      QP:
+        - Qualified Person
+      fashion:
+        - abbigliamento
+        - guardaroba
+        - vestiario
+        - moda
+        - bardatura
+        - fashion
+
+    dictionary_terms:
+      abilitazione: abilitato
+      accettazione: accoglienza
+      acciaio: acciai
+      accompagnatore: accompagnatrice
+      acconciatura: parrucchiera
+      acquisto: comperare
+      acustico: acustica
+      addestramento: addestrare
+      addetto: operatore
+      advisor: consulente
+      aeronautica: aviazione
+      aeroporto: aeroportuale
+      aerospaziale: aerospazio
+      affilatura: arrotare
+      affissione: affiggere
+      agente: rappresentante
+      agenzia: filiale
+      agrario: agricoltore
+      aiutante: assistente
+      alberghiero: hotel
+      alimentare: agroalimentare
+      allestimento: allestire
+      allevamento: allevare
+      allievo: studente
+      ambientale: ambiente
+      ambulante: itinerante
+      ambulanza: autoambulanza
+      amministrative: amministrazione
+      analisi: analista
+      animatore_term: intrattenitore
+      annunciatore: annunciare
+      antichità: antico
+      antropologia: antropologo
+      archeologia: archeologo
+      archiviazione: archivio
+      argento: argentato
+      arma: armaiolo
+      arredamento: arredo
+      artificiale: sintetico
+      artigianale: artigiano
+      asilo: materna
+      assemblaggio_term: montatura
+      assicurativo_term: assicurazione
+      assistenziale: assistenza
+      ateneo: universitario
+      atleta: sportivo
+      ausiliare: ausiliario
+      autista_term: conducente
+      auto: automobile
+      autobus: pullman
+      autotreno: camion
+      azienda: impresa
+      balletto: danza
+      banca: bancario
+      bar: snack-bar
+      bellezza: estetica
+      benzina: carburante
+      biancheria: lingerie
+      bilancio: budget
+      biologia: microbiologia
+      business: affari
+      caccia: cacciatore
+      calzaturiero: calzatura
+      cameriera_term: commis
+      caporedattore: redattore capo
+      caposquadra: capo squadra
+      caricamento: carico
+      carne: carni
+      ceramica: gres
+      chimica: chimico
+      chirurgia: chirurgo
+      cinema: cinematografo
+      cliente: acquirente
+      clinico: clinica
+      club: circolo
+      colf: domestica
+      collegio: convitto
+      commerciante: rivenditore
+      computer: PC
+      comunale: municipale
+      conciatore: conciatura
+      consegnatario: depositario
+      contabile_term: contabilità
+      contratto: contrattuale
+      coordinamento_term: coordinare
+      correttore: revisore
+      cosmesi: cosmetico
+      cronista: giornalista
+      cucina: culinario
+      culturale: cultura
+      custode_term: vigilante
+      database_term: banca dati
+      dattilografia: dattilografa
+      demolizione: abbattimento
+      dialisi: emodialisi
+      dietista: dietologo
+      dirigente: manager
+      disabile: portatore di handicap
+      disegnatore: illustratore
+      distretto: distrettuale
+      docente: insegnante
+      doganale: dogana
+      ecologia: ambientalista
+      edile: edilizio
+      editore: editoriale
+      elettronica: elettronico
+      enologo: sommelier
+      entomologia: entomologo
+      esattoriale: esattoria
+      estetista_term: pedicure
+      estivo: estate
+      export_term: esportazione
+      fabbro: fabbro ferraio
+      facchino: portabagagli
+      famigliare: domestico
+      farmaceutico: farmacista
+      fatturazione: fatturare
+      finanziario: economista
+      fioraio: fiorista
+      fiscale: fiscalista
+      foratura: trapanare
+      formulazione: formulare
+      fornaio: panettiere
+      fotografia: foto
+      fresatura: fresare
+      garzone: ragazzo
+      gastronomia_term: culinaria
+      geologia: stratigrafia
+      geriatria: gerontologia
+      giardinaggio: giardiniere
+      giornalismo: giornalista
+      gravidanza: maternità
+      hostess_term: stewardess
+      idraulica: idraulico
+      illuminazione: luce
+      imballaggio: imballare
+      imbarcazione: nave
+      imbiancatura: imbiancare
+      imbottigliamento_term: imbottigliare
+      immobiliare: immobiliaria
+      impaginazione: impaginare
+      import: importazione
+      impresario: appaltatore
+      incassatore: incassare
+      inchiodatura: bullonare
+      indoss: indossare

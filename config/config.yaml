@@ -5,7 +5,7 @@ data_ingestion:
   database: IT_DISCOVERY
   schema: CONSUMER_INT_MODEL
   input_table: CANDIDATE_CLEANED
-  output_table: MPG_IT_AUTOMATCH_CANDIDATE
+  output_table: MPG_IT_AUTOMATCH_CANDIDATE_NEW
   italian_cities_file: italian_cities/italian_cities.xlsx
   output_table_italian_cities : MPG_IT_AUTOMATCH_ITALIAN_CITIES
 
@@ -14,7 +14,7 @@ data_validation:
   database: IT_DISCOVERY
   schema: CONSUMER_INT_MODEL
   input_table: 
-    candidates: MPG_IT_AUTOMATCH_CANDIDATE
+    candidates: MPG_IT_AUTOMATCH_CANDIDATE_NEW
     italian_cities: MPG_IT_AUTOMATCH_ITALIAN_CITIES
   STATUS_FILE: artifacts/data_validation/status.txt
 
@@ -22,20 +22,20 @@ data_transformation:
   root_dir: artifacts/data_transformation
   database: IT_DISCOVERY
   schema: CONSUMER_INT_MODEL
-  input_table: MPG_IT_AUTOMATCH_CANDIDATE
-  input_table_cleaned: MPG_IT_AUTOMATCH_CANDIDATE_CLEANED
+  input_table: MPG_IT_AUTOMATCH_CANDIDATE_NEW
+  input_table_cleaned: MPG_IT_AUTOMATCH_CANDIDATE_CLEANED_NEW
   input_table_italian_cities: MPG_IT_AUTOMATCH_ITALIAN_CITIES
-  output_table: MPG_IT_AUTOMATCH_CANDIDATE_FEATURES
+  output_table: MPG_IT_AUTOMATCH_CANDIDATE_FEATURES_NEW
 
 search_engine:
   root_dir: artifacts/search_engine
   database: IT_DISCOVERY
   schema: CONSUMER_INT_MODEL
-  input_table: MPG_IT_AUTOMATCH_CANDIDATE_FEATURES
+  input_table: MPG_IT_AUTOMATCH_CANDIDATE_FEATURES_NEW
   search_service: CANDIDATE_SEARCH_SERVICE
 
 llm:
   root_dir: artifacts/llm
   database: IT_DISCOVERY
   schema: CONSUMER_INT_MODEL
-  input_table: MPG_IT_AUTOMATCH_CANDIDATE_FEATURES
+  input_table: MPG_IT_AUTOMATCH_CANDIDATE_FEATURES_NEW

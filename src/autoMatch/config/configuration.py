@@ -35,6 +35,7 @@ class ConfigurationManager:
             columns = schema.columns,
             start_date = schema.date_range.start_date,
             end_date = schema.date_range.end_date,
+            days_prior = schema.date_range.days_prior,
             italian_cities_string_columns = schema.cities_file_columns.string_columns,
             italian_cities_numeric_columns = schema.cities_file_columns.numeric_columns,
         )
@@ -62,6 +63,7 @@ class ConfigurationManager:
 
     def get_data_transformation_config(self) -> DataTransformationConfig:
         config = self.config.data_transformation
+        schema = self.schema.data_transformation
 
         create_directories([config.root_dir])
 
@@ -73,6 +75,7 @@ class ConfigurationManager:
             input_table_cleaned=config.input_table_cleaned,
             input_table_italian_cities = config.input_table_italian_cities,
             output_table = config.output_table,
+            education_levels = schema.education_levels
         )
 
         return data_ingestion_config
@@ -112,7 +115,8 @@ class ConfigurationManager:
             input_table=config.input_table,
             llm_name=params.llm_name,
             columns=schema.columns,
-
+            role_mappings = schema.role_mappings,
+            education_levels = schema.education_levels
         )
 
         return llm_config

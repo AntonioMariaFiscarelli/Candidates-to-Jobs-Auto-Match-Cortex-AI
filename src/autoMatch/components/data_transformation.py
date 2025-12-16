@@ -92,6 +92,7 @@ class DataTransformation:
         database = self.config.database
         schema = self.config.schema
         input_table_cleaned = self.config.input_table_cleaned
+        education_levels = self.config.education_levels
 
         today_string = date.today().strftime("%Y-%m-%d")
 
@@ -118,18 +119,30 @@ class DataTransformation:
                         last_job, 
                         second_last_job, 
                         third_last_job, 
-                        skills (stringa)',
+                        skills (tecniche, stringa),
+                        soft_skills (stringa),
+                        languages (stringa, solo in Italiano),
+                        certifications (stringa),
+                        education (stringa, solo in Italiano, possibili valori (solo uno): {", ".join(education_levels)})',
                         'Rispondi in formato JSON, senza testo extra, attieniti a questo esempio: 
-                        {{"age": 30, "date_of_birth": "1993-05-12", "location": "Milano", "zip_code": "20100", "last_job": "Data Engineer", "second_last_job": "Developer", "third_last_job": "Intern", "skills": "Python, SQL, Java"}}. ',
+                        {{"age": 30, "date_of_birth": "1993-05-12", "location": "Milano", "zip_code": "20100", 
+                        "last_job": "Data Engineer", "second_last_job": "Developer", "third_last_job": "Intern", 
+                        "skills": "Python, SQL, Java",
+                        "soft_skills": "Precisione, Puntualità, Problem solving, Team Building, Gestione del tempo, Assistenza del cliente",
+                        "languages": "Italiano, Inglese",
+                        "certifications": "CISSP, EIPASS, ECDL, PEKIT, ESOL, MOS",
+                        "education": "Diploma scuola superiore}}. ',
                         'Testo: ', description
                     )
                 ) AS ner_json
             FROM 
             (SELECT *
             FROM {database}.{schema}.{input_table_cleaned}
+            --LIMIT 100
             )
 
             """
+
         df = session.sql(query)
 
         def build_clean_parsing_udf():
@@ -175,7 +188,8 @@ class DataTransformation:
         df = df.filter(df["ner_json"].is_not_null())
 
         df = df.with_columns(
-            ["age", "date_of_birth", "location", "zip_code", "last_job", "second_last_job", "third_last_job", "skills"],
+            ["age", "date_of_birth", "location", "zip_code", "last_job", "second_last_job", "third_last_job", 
+             "skills", "soft_skills", "languages", "certifications", "education"],
             [
                 col("ner_json")["age"].cast("STRING"),
                 col("ner_json")["date_of_birth"].cast("STRING"),
@@ -184,7 +198,11 @@ class DataTransformation:
                 col("ner_json")["last_job"].cast("STRING"),
                 col("ner_json")["second_last_job"].cast("STRING"),
                 col("ner_json")["third_last_job"].cast("STRING"),
-                col("ner_json")["skills"].cast("STRING")
+                col("ner_json")["skills"].cast("STRING"),
+                col("ner_json")["soft_skills"].cast("STRING"),
+                col("ner_json")["languages"].cast("STRING"),
+                col("ner_json")["certifications"].cast("STRING"),
+                col("ner_json")["education"].cast("STRING"),
             ]
         )
 
@@ -205,6 +223,10 @@ class DataTransformation:
         df = validate_string(df, "second_last_job")
         df = validate_string(df, "third_last_job")
         df = validate_string(df, "skills")
+        df = validate_string(df, "soft_skills")
+        df = validate_string(df, "languages")
+        df = validate_string(df, "certifications")
+        df = validate_string(df, "education")
 
         # makes sure zip_code is a valid formato
         df = df.with_column(

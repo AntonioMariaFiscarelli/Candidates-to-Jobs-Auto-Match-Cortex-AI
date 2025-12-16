@@ -13,6 +13,7 @@ class DataIngestionConfig:
     columns: dict
     start_date: str
     end_date: str
+    days_prior: int
     italian_cities_string_columns: dict
     italian_cities_numeric_columns: dict
 
@@ -34,6 +35,7 @@ class DataTransformationConfig:
     input_table_cleaned: str
     input_table_italian_cities: str
     output_table: str
+    education_levels: dict
 
 @dataclass(frozen=True)
 class SearchEngineConfig:
@@ -55,3 +57,5 @@ class LLMConfig:
     columns : dict
     llm_name : str
     columns: dict
+    role_mappings: dict
+    education_levels : dict
