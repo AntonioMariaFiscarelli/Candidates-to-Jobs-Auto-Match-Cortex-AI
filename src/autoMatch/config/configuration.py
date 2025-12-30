@@ -36,6 +36,8 @@ class ConfigurationManager:
             start_date = schema.date_range.start_date,
             end_date = schema.date_range.end_date,
             days_prior = schema.date_range.days_prior,
+            desired_locations = schema.desired_locations,
+            parttime_preferenza_perc = schema.parttime_preferenza_perc,
             italian_cities_string_columns = schema.cities_file_columns.string_columns,
             italian_cities_numeric_columns = schema.cities_file_columns.numeric_columns,
         )
@@ -116,7 +118,10 @@ class ConfigurationManager:
             llm_name=params.llm_name,
             columns=schema.columns,
             role_mappings = schema.role_mappings,
-            education_levels = schema.education_levels
+            education_levels = schema.education_levels,
+            desired_locations = schema.desired_locations,
+            turno_preferenza = schema.turno_preferenza,
+            parttime_preferenza_perc = schema.parttime_preferenza_perc
         )
 
         return llm_config

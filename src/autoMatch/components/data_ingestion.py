@@ -1,8 +1,9 @@
 from autoMatch import logger
 import pandas as pd
-from snowflake.snowpark.functions import col, dateadd, current_date, to_date, lit
+from snowflake.snowpark.functions import col, dateadd, current_date, lit, coalesce, when, greatest, expr, split
 from snowflake.snowpark.types import StructType, StructField, StringType, FloatType
 from snowflake.snowpark import Row
+
 
 from autoMatch.entity.config_entity import DataIngestionConfig
 
@@ -19,16 +20,64 @@ class DataIngestion:
         schema = self.config.schema
         input_table = self.config.input_table
         columns = self.config.columns
-        #start_date = self.config.start_date
-        #end_date = self.config.end_date
         days_prior = self.config.days_prior
+        desired_locations = self.config.desired_locations
+        parttime_preferenza_perc = self.config.parttime_preferenza_perc
 
+        #df = session.table(f"{database}.{schema}.{input_table}")
+        #df = df.select([col(c) for c in columns])
+        
+        df = session.sql(f"""
+                         SELECT {",".join(columns)} 
+                         FROM {database}.{schema}.{input_table} 
+                         """)
 
-        df = session.table(f"{database}.{schema}.{input_table}")
-        df = df.select([col(c) for c in columns])
-        #df = df.filter((col("date_added") >= start_date) & (col("date_added") <= end_date))
+        #OPTIMIZE, FILTER in the SQL QUERY
+
         df = df.filter(col("date_added") >= dateadd("day", lit(-days_prior), current_date()))
-        logger.info(f"Table {input_table} successfully read. Number of rows: {df.count()}")
+
+        df = df.with_column("candidateid", col("candidateid").cast("string"))
+        
+        case_parts = []
+        for level in reversed(desired_locations):   # highest first
+            case_parts.append(f"WHEN DESIRED_LOCATIONS ILIKE '%{level}%' THEN '{level}'")
+
+        case_expr = "CASE " + " ".join(case_parts) + " ELSE NULL END"
+
+        df = df.with_column(
+            "DESIRED_LOCATIONS",
+            expr(case_expr)
+        )
+
+        df = df.with_column(
+            "turno_preferenza",
+            split(col("turno_preferenza"), lit(","))
+        )
+
+        # Transform the dataframe
+        df = df.with_column(
+            "PARTTIME_PREFERENZA_PERC",
+            coalesce(col("PARTTIME_PREFERENZA_PERC"), lit("1%"))
+        )
+
+        # Build expressions: if STRING_COL contains 'v', return int(v), else 0
+        exprs = [
+            when(col("PARTTIME_PREFERENZA_PERC").contains(lit(v)), lit(int(v))).otherwise(lit(0))
+            for v in parttime_preferenza_perc
+        ]
+
+        # Take the maximum across all expressions
+        df = df.with_column(
+            "PARTTIME_PREFERENZA_PERC",
+            greatest(*exprs)
+        )
+
+        df = df.with_column(
+            "PARTTIME_PREFERENZA_PERC",
+            when(col("PARTTIME_PREFERENZA_PERC") == 1, None).otherwise(col("PARTTIME_PREFERENZA_PERC"))
+        )
+
+        logger.info(f"Table {input_table} successfully read")#. Number of rows: {df.count()}")
 
         return df
 

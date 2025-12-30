@@ -48,6 +48,46 @@ class DataValidation:
                 with open(status_file, 'w') as f:
                     f.write(f"Validation status: {validation_status}")
 
+                #VALIDATE COLUMN FORMATS
+                """
+                # makes sure salary is a reasonable value
+                df = df.with_column(
+                    "salary_low",
+                    when(
+                        (col("salary_low") != "nan") &
+                        (col("salary_low").cast("INT").is_not_null()) &
+                        (col("salary_low").cast("INT") >= 1) &
+                        (col("salary_low").cast("INT") <= 1000000),
+                        col("salary_low").cast("INT")
+                    ).otherwise(lit(None))
+                )
+            
+                df = df.with_column(
+                    "parttime_preferenza_perc",
+                    when(
+                        # 1. Value is not null and ends with %
+                        col("parttime_preferenza_perc").is_not_null() &
+                        col("parttime_preferenza_perc").like("%"),
+
+                        # 2. Extract numeric part: "10%" → "10"
+                        regexp_replace(col("parttime_preferenza_perc"), "%", "").cast("INT")
+                    )
+                    # 3. Validate numeric rules
+                    .when(
+                        (regexp_replace(col("parttime_preferenza_perc"), "%", "").cast("INT").is_not_null()) &
+                        (regexp_replace(col("parttime_preferenza_perc"), "%", "").cast("INT") >= 0) &
+                        (regexp_replace(col("parttime_preferenza_perc"), "%", "").cast("INT") <= 100) &
+                        (regexp_replace(col("parttime_preferenza_perc"), "%", "").cast("INT") % 10 == 0),
+
+                        # Valid → return integer value
+                        regexp_replace(col("parttime_preferenza_perc"), "%", "").cast("INT")
+                    )
+                    # 4. Otherwise → NULL
+                    .otherwise(lit(None))
+                )
+
+                """
+
             return validation_status
         
         except Exception as e:

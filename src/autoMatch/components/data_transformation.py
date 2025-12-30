@@ -114,12 +114,12 @@ class DataTransformation:
                                 1 e 28 quando MM uguale a 02
                                 1 e 31 per i restanti casi
                             ), 
-                        location (stringa. solo la citta, non includere province o altro), 
+                        location (stringa. il domicilio. solo la citta, non includere province o altro), 
                         zip_code (cap. 5 caratteri numerici), 
                         last_job, 
                         second_last_job, 
                         third_last_job, 
-                        skills (tecniche, stringa),
+                        skills (skills tecniche, stringa),
                         soft_skills (stringa),
                         languages (stringa, solo in Italiano),
                         certifications (stringa),
@@ -217,6 +217,7 @@ class DataTransformation:
                     ).otherwise(lit(None))
                 )
             return df
+        
         
         df = validate_string(df, "location")
         df = validate_string(df, "last_job")

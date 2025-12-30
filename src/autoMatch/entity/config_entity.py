@@ -14,6 +14,8 @@ class DataIngestionConfig:
     start_date: str
     end_date: str
     days_prior: int
+    desired_locations: dict
+    parttime_preferenza_perc: list[int]
     italian_cities_string_columns: dict
     italian_cities_numeric_columns: dict
 
@@ -59,3 +61,6 @@ class LLMConfig:
     columns: dict
     role_mappings: dict
     education_levels : dict
+    desired_locations: dict
+    turno_preferenza: dict
+    parttime_preferenza_perc: list[int]

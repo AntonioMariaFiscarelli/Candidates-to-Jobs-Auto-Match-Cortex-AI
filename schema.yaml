@@ -1,10 +1,38 @@
 
+education_levels: &edu_levels
+  - "Diploma scuola media"
+  - "Diploma scuola superiore"
+  - "Laurea triennale"
+  - "Laurea specialistica"
+  - "Dottorato/Master"
+
+desired_locations: &des_locations
+  - "Locale"
+  - "Regionale"
+  - "Nazionale"
+  - "Internazionale"
+
+turno_preferenza: &turno_pref
+  - "Mattina"
+  - "Pomeriggio"
+  - "Notte"
+  - "Fine Settimana"
+
+parttime_preferenza_perc: &parttime_pref [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 
 data_ingestion:  
     columns: 
       - date_added
       - candidateid
+      - first_name
+      - last_name
       - description
+      - salary_low
+      - date_available
+      - will_relocate
+      - desired_locations
+      - parttime_preferenza_perc
+      - turno_preferenza
     date_range:
       days_prior: 30
       start_date: 2025-10-01
@@ -19,14 +47,24 @@ data_ingestion:
       numeric_columns:
         - latitude
         - longitude
+    desired_locations:
+      *des_locations
 
 data_validation:
     table_schema:
       candidates:  
           columns: 
             date_added: timestamp
-            candidateid: long
-            description: str  
+            candidateid: str #long
+            first_name: str
+            last_name: str
+            description: str
+            salary_low: long
+            date_available: timestamp
+            will_relocate: bool
+            desired_locations: str
+            parttime_preferenza_perc: str
+            turno_preferenza: str
       italian_cities:  
           columns:
             unique_identifier: str
@@ -39,11 +77,7 @@ data_validation:
 
 data_transformation:
     education_levels:
-      - "Diploma scuola media"
-      - "Diploma scuola superiore"
-      - "Laurea triennale"
-      - "Laurea specialistica"
-      - "Dottorato"
+      *edu_levels
   
 search_engine:
     search_columns: 
@@ -78,11 +112,13 @@ llm:
       education: "Titolo di studio"
       certifications: "Certificazioni"
     education_levels:
-      - "Diploma scuola media"
-      - "Diploma scuola superiore"
-      - "Laurea triennale"
-      - "Laurea specialistica"
-      - "Dottorato"
+      *edu_levels
+    desired_locations:
+      *des_locations
+    turno preferenza:
+      *turno_pref
+    parttime_preferenza_perc: 
+      *parttime_pref
     role_mappings:
       acquisti:
         - approvvigionamento
