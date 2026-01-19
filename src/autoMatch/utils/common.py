@@ -3,7 +3,6 @@ from box.exceptions import BoxValueError
 import yaml
 from autoMatch import logger
 import json
-#import joblib
 from ensure import ensure_annotations
 from box import ConfigBox
 from pathlib import Path
@@ -13,6 +12,7 @@ from snowflake.snowpark import functions as F
 
 from snowflake.snowpark.functions import col, trim, lower, when, lit, trim
 
+import math
 
 @ensure_annotations
 def read_yaml(path_to_yaml: Path) -> ConfigBox:
@@ -128,7 +128,7 @@ def get_size(path: Path) -> str:
     size_in_kb = round(os.path.getsize(path)/1024)
     return f"~ {size_in_kb} KB"
 
-
+@ensure_annotations
 def validate_string(df, column_name):
     df = df.with_column(
         column_name,
@@ -140,6 +140,10 @@ def validate_string(df, column_name):
             ).otherwise(lit(None))
         )
     return df
+
+@ensure_annotations
+def is_valid_number(x):
+    return isinstance(x, (int, float)) and not math.isnan(x)
 
 def haversine(lat_ref, lon_ref):
     # --- Haversine distance calculation in Snowpark ---

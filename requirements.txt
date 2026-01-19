@@ -34,4 +34,4 @@ hvplot==0.9.1
 jupyter_bokeh==3.0.7
 bokeh==3.3.4
 
--e .
+#-e .

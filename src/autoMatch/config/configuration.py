@@ -118,6 +118,7 @@ class ConfigurationManager:
             llm_name=params.llm_name,
             columns=schema.columns,
             role_mappings = schema.role_mappings,
+            languages = schema.languages,
             education_levels = schema.education_levels,
             desired_locations = schema.desired_locations,
             turno_preferenza = schema.turno_preferenza,

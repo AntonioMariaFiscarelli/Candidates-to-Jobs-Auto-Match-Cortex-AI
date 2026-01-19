@@ -60,6 +60,7 @@ class LLMConfig:
     llm_name : str
     columns: dict
     role_mappings: dict
+    languages: list[str]
     education_levels : dict
     desired_locations: dict
     turno_preferenza: dict

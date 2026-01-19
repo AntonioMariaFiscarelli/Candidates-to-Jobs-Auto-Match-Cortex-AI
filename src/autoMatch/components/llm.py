@@ -4,14 +4,20 @@ from autoMatch.entity.config_entity import LLMConfig
 from snowflake.snowpark import functions as F
 from snowflake.snowpark.functions import col, lit, coalesce
 
+from snowflake.snowpark.functions import col, trim, lower, length, parse_json, when, lit, trim, to_date, to_varchar
+from snowflake.snowpark.types import StringType, BooleanType
+from snowflake.snowpark.functions import udf
+
+from autoMatch.utils.common import validate_string
+
+
 import json
 import difflib
         
 class LLM:
+
     def __init__(self, config: LLMConfig):
         self.config = config
-
-
 
     def __normalize(self, s: str) -> str:
         return ''.join(ch for ch in s.lower() if ch.isalnum())
@@ -475,4 +481,244 @@ class LLM:
         logger.info(f"Run completed")
 
         return df
+
+    def validate_json(self, df):
+    
+        def build_clean_parsing_udf():
+            def clean(x: str) -> str:
+                if x is None:
+                    return ''
+                x = x.lower().lstrip()
+                if x.startswith("```json"):
+                    x = x[8:].lstrip()
+                x = x.replace('\n', ' ').replace('\t', ' ').replace('\\', '').strip()
+                x = ' '.join(x.split())
+                if x.endswith("```"):
+                    x = x[:-3].rstrip()
+                if x.endswith("'") or x.endswith('"'):
+                    x = x[:-1].rstrip()
+                return x
+
+            return udf(clean, return_type=StringType(), input_types=[StringType()])
+        clean_udf = build_clean_parsing_udf()
+
+        df = df.with_column("ner_json", clean_udf(df["ner_json"]))
+
+        def build_is_valid_json_udf():
+            import json
+            def is_valid(text: str) -> bool:
+                if not text:
+                    return False
+                try:
+                    json.loads(text)
+                    return True
+                except Exception:
+                    return False
+
+            return udf(is_valid, return_type=BooleanType(), input_types=[StringType()])
         
+        is_valid_json_udf = build_is_valid_json_udf()
+        df = df.with_column("is_valid_json", is_valid_json_udf(df["ner_json"]))
+        df = df.filter(col("is_valid_json") == True)
+        df = df.drop("is_valid_json")
+
+        df = df.with_column("ner_json", parse_json(col("ner_json")))
+
+        df = df.filter(df["ner_json"].is_not_null())
+
+        
+        df = df.with_columns(
+            ["turno_preferenza", "parttime_preferenza_perc", "skills", "languages", "education", "certifications"],
+            [
+                col("ner_json")["turno_preferenza"].cast("STRING"),
+                col("ner_json")["parttime_preferenza_perc"].cast("STRING"),
+                col("ner_json")["skills"].cast("STRING"),
+                col("ner_json")["languages"].cast("STRING"), 
+                col("ner_json")["education"].cast("STRING"),
+                col("ner_json")["certifications"].cast("STRING"),
+            ]
+        )
+
+        def validate_string(df, column_name):
+            df = df.with_column(
+                column_name,
+                when(
+                    (col(column_name).is_not_null()) &
+                    (trim(col(column_name)) != "") &
+                    (~lower(trim(col(column_name))).isin(["null", "none", "nan"])),
+                    col(column_name)
+                    ).otherwise(lit(None))
+                )
+            return df
+        
+        
+        df = validate_string(df, "turno_preferenza")
+        df = validate_string(df, "parttime_preferenza_perc")
+        df = validate_string(df, "skills")
+        df = validate_string(df, "languages")
+        df = validate_string(df, "education")
+        df = validate_string(df, "certifications")
+
+
+        # makes sure age is a reasonable value
+        df = df.with_column(
+            "parttime_preferenza_perc",
+            when(
+                (col("parttime_preferenza_perc") != "nan") &
+                (col("parttime_preferenza_perc").cast("INT").is_not_null()) &
+                (col("parttime_preferenza_perc").cast("INT") >= 0) &
+                (col("parttime_preferenza_perc").cast("INT") <= 100),
+                col("parttime_preferenza_perc").cast("INT")
+            ).otherwise(lit(None))
+        )
+
+        df = df.drop("ner_json")
+        df = df.drop("description")
+
+        return df
+
+    def extract_vacancy_info(self, session, vacancy_id):
+        """
+        Creates custom prompt based recruiter requirements.
+        It creates a prompt for each mandatory skill (asks the LLM to reply with True or False if the candidate has the spefic skill or not)
+        It creates a prompt for each optional skill (asks the LLM to provide a score bases on the matching skills)
+
+        Returns a prompt dictionary:
+        prompts = {
+            'NEW_COLUMN' : [prompt, columns],
+            }
+        NEW_COLUMN: new column created, bool for mandatory skills and numeric for optional skills
+        prompt: prompt used for the Cortex AI request
+        columns: candidate column(s) name (or combination) provided to Cortex AI
+        """
+
+        llm_name = self.config.llm_name
+
+        database = self.config.database
+        schema = self.config.schema
+        input_table = self.config.input_table
+
+        turno_preferenza = self.config.turno_preferenza
+        education_levels = self.config.education_levels
+        parttime_preferenza_perc = self.config.parttime_preferenza_perc
+
+        open_texts = ["DESCRIZIONE_USO_INTERNO", "TESTO_PUBBLICAZIONE", "RICHIESTE_AGGIUNTIVE", "REQUISITI"]
+        #all_texts = ["skills_list", "part_time_percent", "titoli_richiesti", "DESCRIZIONE_USO_INTERNO", "TESTO_PUBBLICAZIONE", "RICHIESTE_AGGIUNTIVE", "REQUISITI"]
+        
+        texts = ["skills", "parttime_preferenza_perc", "education", "DESCRIZIONE_USO_INTERNO", "TESTO_PUBBLICAZIONE", "RICHIESTE_AGGIUNTIVE", "REQUISITI"]
+        labels = ["Skills richieste", "Percentuale part time", "Titoli di studio richiesti", "DESCRIZIONE USO INTERNO", "TESTO PUBBLICAZIONE", "RICHIESTE AGGIUNTIVE", "REQUISITI"]
+        
+        all_texts = []
+        for label, text in zip(labels, texts):
+            all_texts.append(f"""'{label}: ', {text} """)
+
+        print(all_texts)
+        concat_text = f"""CONCAT( {", '| ', ".join(all_texts)}  )"""
+        #concat_text = "CONCAT('skills: ', skills , 'descrizione uso interno: ', DESCRIZIONE_USO_INTERNO, ' | ', 'testo pubblicazione', TESTO_PUBBLICAZIONE)"
+        print(concat_text)
+
+        query = session.sql(f"""
+            CREATE OR REPLACE TABLE {database}.{schema}.JOBORDER_APP AS
+            SELECT
+                joborderid,
+                dateadded,
+                jobtitle,
+                citta AS location,
+                salary AS salary_low,
+                data_inizio_validita AS date_available,
+                COALESCE(CAST(part_time_percent AS STRING), '') AS parttime_preferenza_perc,
+                COALESCE(skill_list, '') AS skills,
+                COALESCE(titoli_richiesti, '') AS education,
+                COALESCE(DESCRIZIONE_USO_INTERNO, '') AS DESCRIZIONE_USO_INTERNO,
+                COALESCE(TESTO_PUBBLICAZIONE, '') AS TESTO_PUBBLICAZIONE,
+                COALESCE(RICHIESTE_AGGIUNTIVE, '') AS RICHIESTE_AGGIUNTIVE,
+                COALESCE(REQUISITI, '') AS REQUISITI
+            FROM {database}.{schema}.JOBORDER_CLEANED
+            WHERE CAST(joborderid AS STRING) = '{vacancy_id}'
+        """)
+
+        query.collect()
+
+        
+        query = f"""
+            SELECT
+                joborderid, dateadded, 
+                jobtitle, 
+                location, 
+                salary_low, 
+                date_available,
+                {concat_text} as description,
+                SNOWFLAKE.CORTEX.COMPLETE(
+                    'claude-4-sonnet',
+                    CONCAT(
+                        'Stai analizzando  una posizione lavorativa aperta, estrai i seguenti campi: 
+                        turno_preferenza (turni richiesti per la posizione. stringa, possibili valori (anche multipli): {", ".join(turno_preferenza)}), 
+                        parttime_preferenza_perc (percentuale di part time richiesta. stringa, possibili valori (solo uno): {", ".join(str(x) for x in parttime_preferenza_perc)}),
+                        skills (skills tecniche richieste (no soft skills). stringa, ad esempio Python, guida muletto, gestione progetti ecc),
+                        languages (lingue richieste, solo se richieste esplicitamente. stringa, ad esempio Inglese, Francese ecc )
+                        education (titolo di studio richiesto. stringa, solo in Italiano. Possibili valori (solo uno): {", ".join(education_levels)}),
+                        certifications (certificazioni richieste. stringa, ad esempio CISSP, EIPASS, ECDL, Patente B)',
+
+                        'Rispondi in formato JSON, senza testo extra, attieniti a questo esempio: 
+                        {{"turno_preferenza": "Pomeriggio, Notte" ,
+                        "parttime_preferenza_perc": "30%",
+                        "skills": "Python, SQL",
+                        "languages": "Italiano, Inglese",
+                        "education": "Diploma scuola superiore,
+                        "certifications": "CISSP, EIPASS, ECDL"}}. ',
+
+                        'Testo: ', {concat_text}
+                    )
+                ) AS ner_json
+            FROM 
+            (SELECT * FROM {database}.{schema}.JOBORDER_APP)
+
+            """
+        
+        """ 
+            (SELECT 
+                joborderid, dateadded, 
+                jobtitle, 
+                citta as location, 
+                salary as salary_low, 
+                data_inizio_validita as date_available, 
+                COALESCE(CAST(part_time_percent AS STRING), '') as parttime_preferenza_perc,
+                COALESCE(skill_list, '') as skills,
+                COALESCE(titoli_richiesti, '') as education,
+                COALESCE(DESCRIZIONE_USO_INTERNO, '') as DESCRIZIONE_USO_INTERNO, 
+                COALESCE(TESTO_PUBBLICAZIONE, '') as TESTO_PUBBLICAZIONE, 
+                COALESCE(RICHIESTE_AGGIUNTIVE, '') as RICHIESTE_AGGIUNTIVE, 
+                COALESCE(REQUISITI, '') as REQUISITI
+            FROM {database}.{schema}.JOBORDER_CLEANED
+            WHERE CAST(joborderid AS STRING) = '{vacancy_id}'--LIMIT 100
+            )
+        """
+        
+        """ 
+                joborderid, date_added, 
+                jobtitle, 
+                citta as location, 
+                salary as salary_low, 
+                data_inizio_validita as date_available, 
+                CONCAT({"| ".join(open_texts)}) as turno_preferenza,
+                CONCAT(CAST(part_time_percent AS STRING), '| ', {"| ".join(open_texts)}) as parttime_preferenza_perc,
+                CONCAT(skill_list, '| ', {"| ".join(open_texts)}) as skills,
+                CONCAT({"| ".join(open_texts)}) as languages,
+                CONCAT(titoli_richiesti, '| ', {"| ".join(open_texts)}) as education,
+                CONCAT({"| ".join(open_texts)}) as certifications
+        """
+        
+        df = session.sql(query)
+
+        df = self.validate_json(df)
+
+        return df
+    
+    def write_table(self, df, table_name = 'output_table'):
+        """
+        Writes table
+        Function returns nothing
+        """
+        df.write.save_as_table(table_name, mode="overwrite")
+        logger.info(f"Table {table_name} successfully written")
+

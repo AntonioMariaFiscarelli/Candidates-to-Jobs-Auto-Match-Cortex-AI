@@ -2,10 +2,12 @@
 import streamlit as st
 from snowflake.snowpark.context import get_active_session
 from autoMatch.utils.snowflake_utils import get_snowpark_session
+from autoMatch.utils.common import is_valid_number
 from datetime import date
 from src.autoMatch.utils.common import haversine
 from snowflake.snowpark import functions as F
-from snowflake.snowpark.functions import col, lit, concat, to_varchar, expr, count_distinct, lower, trim
+from snowflake.snowpark.functions import col, lit, concat, to_varchar, expr, count_distinct, lower, trim, array_size
+import re
 
 from autoMatch.config.configuration import ConfigurationManager
 from autoMatch.components.llm import LLM
@@ -31,58 +33,141 @@ def get_LLM():
 session = get_snowpark_session_streamlit()
 llm = get_LLM()
 
-#TITOLI_STUDIO_IT = [
-#    "Diploma scuola media", "Diploma scuola superiore", "Laurea triennale", "Laurea specialistica", "Dottorato"
-#]
+languages = [""] + llm.config.languages
 education_levels = [""] + llm.config.education_levels
-
 desired_locations = [""] + llm.config.desired_locations
-
 turno_preferenza = [""] + llm.config.turno_preferenza
-
 parttime_preferenza_perc = [0] + llm.config.parttime_preferenza_perc # [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 
-def init_role_input():
-    st.session_state.role = st.text_input("Ruolo ricercato", value="Magazziniere", 
-                                          help="Esempio: Magazziniere")
+from datetime import date
 
-def init_location_input():
-    st.session_state.location = st.text_input("Location", value="Bari", 
-                                              help="Città di ricerca. Esempio: Bari")
+def assign_if_not_none(key, value): 
+    if value is not None: 
+        st.session_state[key] = value
 
-def init_max_distance_input():
-    st.session_state.max_distance = st.number_input("Distanza massima in KM", value=20, 
-                                                    help="""Distanza massima di ricerca rispetto alla città di riferimento. 
-                                                    Tutti i candidati al di fuori del raggio specificato verrano scartati
-                                                    """)
+def assign_string_if_not_none(key, value, allowed):
+    if value is None:
+        st.session_state[key] = ""
+    else:
+        allowed = set(allowed)  # the options of your multiselect
 
-def init_max_age_input():
-    st.session_state.max_age = st.number_input("Età massima", min_value=18, value=40, step=1, help="""Età massima. 
-                                               Tutti i candidati di età superiore verrano scartati""")
+        if isinstance(value, list):
+            # keep only valid values
+            if len(list) == 0:
+                st.session_state[key] = ""
+            elif len(list) == 1:
+                st.session_state[key] = value[0]
+            else:
+                cleaned = [a for a in allowed if a.lower() in [v.lower() for v in value]]
+                if cleaned:
+                    st.session_state[key] = ", ".join(cleaned)
+        elif isinstance(value, str) and value.strip():
+            if(value.strip()== ""):
+                st.session_state[key] = ""
+            else:
+                parts = [v.strip().lower() for v in value.split(",")]
+                cleaned = [a for a in allowed if a.lower() in parts]#[v for v in parts if v in allowed]
+                if cleaned:
+                    st.session_state[key] = ", ".join(cleaned)
+
+
+def assign_list_if_not_none(key, value, allowed): 
+    if value is None:
+        st.session_state[key] = []
+    else:
+        allowed = set(allowed)  # the options of your multiselect
+
+        if isinstance(value, list):
+            # keep only valid values
+            if len(list) == 0:
+                st.session_state[key] = [""]
+            elif len(list) == 1:
+                st.session_state[key] = [value]
+            else:
+                cleaned = [a for a in allowed if a in value]
+                if cleaned:
+                    st.session_state[key] = cleaned
+        elif isinstance(value, str) and value.strip():
+            if(value.strip()== ""):
+                st.session_state[key] = [""]
+            else:
+                parts = [v.strip().lower() for v in value.split(",")]
+                cleaned = [a for a in allowed if a.lower() in parts]#[v for v in parts if v in allowed]
+                if cleaned:
+                    st.session_state[key] = cleaned
+
+
+def set_default_values(vacancy_id):
+    df_vacancy = llm.extract_vacancy_info(session, vacancy_id)
+    row = df_vacancy.collect()[0]
+
+    #AZZERA TUTTI I CAMPI DI INPUT
+
+    if df_vacancy.count() == 1:
+        row = df_vacancy.collect()[0]
+        data = row.as_dict()
+
+        assign_if_not_none("role", data.get("JOBTITLE"))
+        assign_if_not_none("location", data.get("LOCATION"))
+
+        assign_if_not_none("max_ral", data.get("SALARY_LOW"))
+        assign_if_not_none("date_available", data.get("DATE_AVAILABLE"))
+        #assign_if_not_none("will_relocate", data.get("WILL_RELOCATE"))
+        #assign_if_not_none("desired_locations", data.get("DESIRED_LOCATIONS"))
+        assign_list_if_not_none("turno_preferenza", data.get("TURNO_PREFERENZA"), turno_preferenza)
+        assign_if_not_none("parttime_preferenza_perc", data.get("PARTTIME_PREFERENZA_PERC"))
+        assign_if_not_none("skills_opt", data.get("SKILLS"))
+        assign_list_if_not_none("skills_languages_opt", data.get("LANGUAGES"), languages)
+        assign_string_if_not_none("skills_education_opt", data.get("EDUCATION"), education_levels)
+        assign_if_not_none("skills_certifications_opt", data.get("CERTIFICATIONS"))
+
+        
+
+
+def init_vacancy_input():
+    vacancy_id_raw = st.text_input(
+        "Inserire vacancy ID",
+        key="vacancy_id_raw",
+        help="Inserire vacancy ID per l'estrazione automatica di feature"
+    )
+
+    # Mantieni solo cifre
+    numeric_value = re.sub(r"\D", "", vacancy_id_raw)
+
+    # Se l'ID è cambiato, aggiorna i default
+    if numeric_value:# and st.session_state.get("vacancy_id") != numeric_value:
+        st.session_state.vacancy_id = numeric_value
+        set_default_values(numeric_value)   # <-- aggiorna i campi PRIMA di disegnare gli input
+
 
 def bullhorn_fields_input():
     col1, col2, col3, col4, col5, col6 = st.columns(6)
 
     with col1:
-        st.session_state.max_ral = st.number_input("RAL attuale", min_value=0, step=1, help="""RAL attuale. 
-                                            Tutti i candidati con RAL superiore a quella specificate verranno scartati""")
+        st.number_input("RAL attuale", 
+                        min_value=0, step=1, 
+                        key="max_ral",
+                        help="""RAL attuale. 
+                        Tutti i candidati con RAL superiore a quella specificate verranno scartati""")
     with col2:
-        st.session_state.date_available = st.date_input(
+        st.date_input(
             "Disponibile da",
-            value=None,#date.today(),   # default to today
+            #value=None,#date.today(),   # default to today
+            key="date_available",
             help="""Data in cui il candidato è disponibile a iniziare. 
                     I candidati con disponibilità successiva verranno scartati."""
         ) 
 
     with col3:
-        st.session_state.will_relocate = st.checkbox(
+        st.checkbox(
             "Disponibile al trasferimento",
+            key="will_relocate",
             help="""Se selezionato, verranno mostrati solo i candidati disponibili al trasferimento."""
         )
         #if st.button("Resetta data a oggi"):
         #    st.session_state.date_available = date.today()
     
-    st.session_state.setdefault("desired_locations",  desired_locations[0])
+    #st.session_state.setdefault("desired_locations",  desired_locations[0])
     with col4:
         st.selectbox(
             "Disponibilità geografica",
@@ -91,7 +176,7 @@ def bullhorn_fields_input():
             help="""I candidati che non sono disponibili nelle zone specificate verranno scartati"""
         )
 
-    st.session_state.setdefault("turno_preferenza", [])
+    #st.session_state.setdefault("turno_preferenza", [])
     with col5:
         st.multiselect(
             "Seleziona turni",
@@ -108,36 +193,55 @@ def bullhorn_fields_input():
             help="""I candidati con percentuale preferenza part-time inferiore a quella specificata verranno scartati"""
         )
 
-def init_max_ral_input():
-    st.session_state.max_ral = st.number_input("RAL attuale", min_value=0, step=1, help="""RAL attuale. 
-                                               Tutti i candidati con RAL superiore a quella specificate verranno scartati""")
 
-def init_date_available_input():
-    st.session_state.date_available = st.date_input(
-        "Disponibile da",
-        value=date.today(),   # default to today
-        help="""Data in cui il candidato è disponibile a iniziare. 
-                I candidati con disponibilità successiva verranno scartati."""
-    )
+
+def init_role_input():
+    st.text_input("Ruolo ricercato", 
+                  #value="Magazziniere", 
+                  key="role",
+                  help="Esempio: Magazziniere")
+
+def init_location_input():
+    st.text_input("Location", 
+                  #value="Bari", 
+                  key="location",
+                  help="Città di ricerca. Esempio: Bari")
+
+def init_max_distance_input():
+    st.session_state.max_distance = st.number_input("Distanza massima in KM", 
+                                                    value=20, 
+                                                    step=1, 
+                                                    help="""Distanza massima di ricerca rispetto alla città di riferimento. 
+                                                    Tutti i candidati al di fuori del raggio specificato verrano scartati
+                                                    """)
+
+def init_max_age_input():
+    st.session_state.max_age = st.number_input("Età massima", 
+                                               #min_value=18, 
+                                               #value=40, 
+                                               step=1, 
+                                               help="""Età massima. 
+                                               Tutti i candidati di età superiore verrano scartati""")
+
 
 
 def init_skills_input():
     col1, col2 = st.columns(2)
     with col1:
-        st.session_state.skills_mand = st.text_area(
+        st.text_area(
             "Skills tecniche essenziali (separate da virgola)",
             value="",#"Muletto",
-            key="skills_mand_text_area",
+            key="skills_mand",
             help="""Esempio: muletto, pacchetto office, gestionale inventario. 
             I candidati non in possesso di tutte le skills richieste verrano scartati"""
         )
 
     # metti la seconda text_area nella seconda colonna
     with col2:
-        st.session_state.skills_opt = st.text_area(
+        st.text_area(
             "Skills tecniche bonus (separate da virgola)",
-            value="",#"Excel",
-            key="skills_opt_text_area",
+            #value="",#"Excel",
+            key="skills_opt",
             help="""Esempio: muletto, pacchetto office, gestionale inventario. 
             Un bonus sarà assegnato per ogni skill corrispondente del candidato"""
         )
@@ -145,41 +249,36 @@ def init_skills_input():
 def init_skills_soft_input():
     st.session_state.skills_soft = st.text_area("Skills soft (separate da virgola)", value="")
 
-LINGUE_IT = [
-    "Inglese", "Italiano", "Spagnolo", "Francese", "Tedesco",
-    "Portoghese", "Cinese", "Giapponese", "Coreano", "Russo",
-    "Arabo", "Olandese", "Svedese", "Polacco", "Turco", "Urdu", "Bangalese"
-]
 
 def init_skills_languages_input():
-    st.session_state.setdefault("skills_languages_selected_mand", [])
-    st.session_state.setdefault("skills_languages_selected_opt", [])
+    #st.session_state.setdefault("skills_languages_selected_mand", [])
+    #st.session_state.setdefault("skills_languages_selected_opt", [])
 
     col1, col2 = st.columns(2)
     with col1:
         st.multiselect(
             "Seleziona lingue obbligatorie",
-            options=LINGUE_IT,
-            key="skills_languages_selected_mand",
+            options=languages,
+            key="skills_languages_mand",
             help="""I candidati che non conoscono le lingue richieste verrano scartati"""
         )
 
     with col2:
         st.multiselect(
             "Seleziona lingue bonus",
-            options=LINGUE_IT,
-            key="skills_languages_selected_opt",
+            options=languages,
+            key="skills_languages_opt",
             help="""Un bonus sarà assegnato per ogni lingua conosciuta dal candidato tra quelle richieste"""
         )
 
-    st.session_state.skills_languages_mand = st.session_state["skills_languages_selected_mand"]
-    st.session_state.skills_languages_opt = st.session_state["skills_languages_selected_opt"]
+    #st.session_state.skills_languages_mand = st.session_state["skills_languages_selected_mand"]
+    #st.session_state.skills_languages_opt = st.session_state["skills_languages_selected_opt"]
 
 
 def init_skills_education_input():
 
-    st.session_state.setdefault("skills_education_selected_mand",  education_levels[0])
-    st.session_state.setdefault("skills_education_selected_opt", education_levels[0])
+    #st.session_state.setdefault("skills_education_selected_mand",  education_levels[0])
+    #st.session_state.setdefault("skills_education_selected_opt", education_levels[0])
 
     # layout: multiselect larga, checkbox stretta a destra
     col1, col2 = st.columns(2)
@@ -187,36 +286,36 @@ def init_skills_education_input():
         st.selectbox(
             "Seleziona il titolo di studio minimo",
             options=education_levels,
-            key="skills_education_selected_mand",
+            key="skills_education_mand",
             help="I candidati che non possiedono un titolo di studio equivalente o superiore verranno scartati"""
         )
     with col2:
         st.selectbox(
             "Seleziona titolo di studio bonus",
             options=education_levels,
-            key="skills_education_selected_opt",
+            key="skills_education_opt",
             help="Un bonus sarà assegnato per ogni titolo di studio del candidato che risulti superiore a quello richiesto"
         )
 
-    st.session_state.skills_education_mand = st.session_state["skills_education_selected_mand"]
-    st.session_state.skills_education_opt = st.session_state["skills_education_selected_opt"]# if ed_opt != education_levels[0] else ""
+    #st.session_state.skills_education_mand = st.session_state["skills_education_selected_mand"]
+    #st.session_state.skills_education_opt = st.session_state["skills_education_selected_opt"]# if ed_opt != education_levels[0] else ""
 
 def init_skills_certifications_input():
     col1, col2 = st.columns(2)
     with col1:
-        st.session_state.skills_certifications_mand = st.text_area(
+        st.text_area(
             "Certificazioni essenziali (separate da virgola)",
             value="",#"Muletto",
-            key="skills_certifications_mand_text_area",
+            key="skills_certifications_mand",
             help="""Esempio: patente B, ECTL. 
             I candidati che non possiedono le certificazioni richieste verranno scartati"""
         )
 
     with col2:
-        st.session_state.skills_certifications_opt = st.text_area(
+        st.text_area(
             "Certificazioni bonus (separate da virgola)",
             value="",#"Excel",
-            key="skills_certifications_opt_text_area",
+            key="skills_certifications_opt",
             help="""Esempio: patente B, ECTL. 
             Un bonus sarà assegnato per ogni certificazione corrispondente del candidato
             """
@@ -229,8 +328,8 @@ def columns_to_show():
     cols_default = ["candidateid", "first_name", "last_name", "location", "url"]
     #cols.append("score_job")
 
-    if st.session_state.max_age:
-        cols_default.append("age")
+    #if st.session_state.max_age:
+    cols_default.append("age")
 
     cols_default.extend(["last_job", "second_last_job", "third_last_job"])
 
@@ -279,19 +378,16 @@ def columns_to_show():
 
 
 st.title("🔎 Automatch")
-st.markdown("Inserisci i criteri di ricerca per trovare i candidati ideali.")
-
+st.markdown("Inserisci l'ID della vacancy per definire automaticamente i criteri di ricerca")
+init_vacancy_input()
 st.subheader("Filtri di ricerca")
-
-
+st.markdown("Modifica i criteri di ricerca per trovare i candidati ideali.")
 
 init_role_input()
 init_location_input()
 init_max_distance_input()
 init_max_age_input()
 bullhorn_fields_input()
-#init_max_ral_input()
-#init_date_available_input()
 init_skills_input()
 #init_skills_soft_input()
 st.write("")
@@ -309,7 +405,7 @@ def filter_candidates():
 
     if st.session_state.max_age:
         df_candidates = df_candidates.filter(
-            (col("AGE") <= st.session_state.max_age) | col("AGE").is_null()
+            (col("AGE") <= st.session_state.max_age) | col("AGE").is_null() | col("AGE") <= lit(0)
         )
 
     if st.session_state.max_ral:
@@ -317,30 +413,33 @@ def filter_candidates():
             (col("SALARY_LOW") <= st.session_state.max_ral) | 
             (col("SALARY_LOW").is_null())
         )
-        df_candidates = df_candidates.sort(
-            col("SALARY_LOW").is_null().asc()   # False (non-null) comes before True (null)
-        )
+        if(False):
+            df_candidates = df_candidates.sort(
+                col("SALARY_LOW").is_null().asc()   # False (non-null) comes before True (null)
+            )
 
     if st.session_state.date_available:
         df_candidates = df_candidates.filter(
             (col("DATE_AVAILABLE") <= lit(st.session_state.date_available)) |
             (col("DATE_AVAILABLE").is_null())
         )
-        df_candidates = df_candidates.sort(
-            col("DATE_AVAILABLE").is_null().asc(),   # non-null first
-            col("DATE_AVAILABLE").asc()              # then earliest dates
-        )
+        if(False):
+            df_candidates = df_candidates.sort(
+                col("DATE_AVAILABLE").is_null().asc(),   # non-null first
+                col("DATE_AVAILABLE").asc()              # then earliest dates
+            )
 
     if st.session_state.will_relocate:
         df_candidates = df_candidates.filter(
             (col("WILL_RELOCATE") == True) | 
             (col("WILL_RELOCATE").is_null())
         )
-        df_candidates = df_candidates.sort(
-            col("WILL_RELOCATE").is_null().asc(),  # non-null first
-            col("WILL_RELOCATE").desc()            # True first, False second
-        )
-
+        if(False):
+            df_candidates = df_candidates.sort(
+                col("WILL_RELOCATE").is_null().asc(),  # non-null first
+                col("WILL_RELOCATE").desc()            # True first, False second
+            )
+        
     if st.session_state.desired_locations:
         mapping = {level: i+1 for i, level in enumerate(desired_locations)}
 
@@ -357,6 +456,13 @@ def filter_candidates():
     if st.session_state.turno_preferenza:
         selected = st.session_state.turno_preferenza
 
+        dfcols = df_candidates.columns
+
+        df_no_turni = df_candidates.filter(
+            (col("TURNO_PREFERENZA").is_null()) |
+            (array_size(col("TURNO_PREFERENZA")) == 0)
+        )
+
         # Flatten the array into rows
         df_flat = df_candidates.join_table_function(
             "flatten",
@@ -367,6 +473,7 @@ def filter_candidates():
         )
 
         # Keep only rows where turno_value is one of the selected values
+
         df_filtered = df_flat.filter(
             col("turno_value").isin(selected)
         )
@@ -379,7 +486,11 @@ def filter_candidates():
             .filter(col("tv") == len(selected))
         )
         # Join back to original rows
-        df_candidates = df_match_all.join(df_candidates, "candidateid")
+        df_si_turni = df_match_all.join(df_candidates, "candidateid")
+
+        df_si_turni = df_si_turni.select(dfcols)
+        df_no_turni = df_no_turni.select(dfcols)
+        df_candidates = df_si_turni.union_all(df_no_turni)
         df_candidates = df_candidates.with_column("TURNO_PREFERENZA", to_varchar(col("TURNO_PREFERENZA")))
 
     if st.session_state.parttime_preferenza_perc:
@@ -387,10 +498,11 @@ def filter_candidates():
             (col("PARTTIME_PREFERENZA_PERC") >= st.session_state.parttime_preferenza_perc) | 
             (col("PARTTIME_PREFERENZA_PERC").is_null())
         )
-        df_candidates = df_candidates.sort(
-            col("PARTTIME_PREFERENZA_PERC").is_null().asc()   # False (non-null) comes before True (null)
-        )
-
+        if(False):
+            df_candidates = df_candidates.sort(
+                col("PARTTIME_PREFERENZA_PERC").is_null().asc()   # False (non-null) comes before True (null)
+            )
+        
 
     # Skills filter
     if(False):
@@ -430,17 +542,19 @@ def filter_candidates():
     )
     location_coords = df_location.collect()
 
-    if not location_coords:
+    if not location_coords or location_coords is None:
         st.warning("Location non trovata.")
     else:
         location_dict = location_coords[0].as_dict()
         lat_ref = location_dict.get("LATITUDE")
         lon_ref = location_dict.get("LONGITUDE")
 
-        df_candidates = df_candidates.with_column("distance_km", haversine(lat_ref, lon_ref))
-        df_candidates = df_candidates.filter(col("distance_km") <= st.session_state.max_distance)
+        if is_valid_number(lat_ref) and is_valid_number(lon_ref):
+            df_candidates = df_candidates.with_column("distance_km", haversine(lat_ref, lon_ref))
+            df_candidates = df_candidates.filter(col("distance_km") <= st.session_state.max_distance)
 
-        df_candidates = df_candidates.drop("LATITUDE", "LONGITUDE")
+            df_candidates = df_candidates.drop("LATITUDE", "LONGITUDE")
+
     return df_candidates
 
 if st.button("Cerca candidati"):
@@ -453,6 +567,8 @@ if st.button("Cerca candidati"):
         columns = llm.config.columns  
 
         df_candidates = filter_candidates()
+
+        df_candidates.write.save_as_table(f"{db}.{schema}.{table}_APP", mode="overwrite")
 
         # Count rows in the Snowpark DataFrame
         candidate_count = df_candidates.count()
@@ -472,7 +588,6 @@ if st.button("Cerca candidati"):
                 st.session_state.skills_certifications_opt
             )
 
-            df_candidates.write.save_as_table(f"{db}.{schema}.{table}_APP", mode="overwrite")
 
             if(False):
                 st.text(
@@ -484,7 +599,7 @@ if st.button("Cerca candidati"):
                         )
 
 
-            top_candidates = llm.call_ai_row(session, prompts).limit(100)
+            top_candidates = llm.call_ai_row(session, prompts)#.limit(100)
 
             top_candidates = top_candidates.with_column("URL",concat(lit("https://cls70.bullhornstaffing.com/BullhornSTAFFING/OpenWindow.cfm?Entity=Candidate&id="),col("CANDIDATEID")))
             top_candidates = top_candidates.sort(col("SCORE").desc())

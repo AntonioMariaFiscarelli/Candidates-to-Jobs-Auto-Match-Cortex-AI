@@ -15,11 +15,7 @@ class LLMTrainingPipeline:
         config = ConfigurationManager()
         llm_config = config.get_llm_config()
         llm = LLM(config=llm_config)
-        df = session.sql("SELECT * FROM IT_DISCOVERY.CONSUMER_INT_MODEL.MPG_IT_AUTOMATCH_CANDIDATE_FEATURES LIMIT 100")
-        print(df.columns)
-        prompt = llm.create_prompt("Data Scientist", "Python, Java", df)
-        print(prompt)
-        response = llm.call_ai(session, prompt)
+        response = llm.create_prompt_vacancy(session)
         print(response)
 
 

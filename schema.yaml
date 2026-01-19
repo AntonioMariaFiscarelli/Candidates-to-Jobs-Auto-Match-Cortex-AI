@@ -1,4 +1,6 @@
 
+languages: &langs ["Inglese", "Italiano", "Spagnolo", "Francese", "Tedesco", "Portoghese", "Cinese", "Giapponese", "Coreano", "Russo", "Arabo", "Olandese", "Svedese", "Polacco", "Turco", "Urdu", "Bangalese"]
+
 education_levels: &edu_levels
   - "Diploma scuola media"
   - "Diploma scuola superiore"
@@ -111,6 +113,8 @@ llm:
       languages: "Lingue"
       education: "Titolo di studio"
       certifications: "Certificazioni"
+    languages:
+      *langs
     education_levels:
       *edu_levels
     desired_locations:
