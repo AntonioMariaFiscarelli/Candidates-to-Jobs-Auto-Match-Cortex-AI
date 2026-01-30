@@ -1,0 +1,28 @@
+snowflake-snowpark-python==1.15.0
+snowflake-connector-python[pandas]==3.7.0
+
+pandas==2.1.4
+pyarrow==14.0.2
+
+python-dotenv
+pyyaml
+tqdm
+beautifulsoup4==4.12.2
+openpyxl
+tabulate==0.9.0
+
+# Visualization libraries (all supported)
+matplotlib==3.8.2
+seaborn==0.13.2
+bokeh==3.3.4
+holoviews==1.18.3
+hvplot==0.9.1
+jupyter_bokeh==3.0.7
+
+# Jupyter support (optional but allowed)
+notebook
+ipykernel
+
+streamlit==1.31.0
+
+snowflake-cli-labs

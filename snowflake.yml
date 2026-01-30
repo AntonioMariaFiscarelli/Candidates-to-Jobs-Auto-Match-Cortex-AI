@@ -1,0 +1,14 @@
+definition_version: 2
+entities:
+  my_streamlit:
+    type: streamlit
+    identifier: autoMatch_IT_app
+    query_warehouse: IT_NONPROD_CTDM_COMPUTE_WH
+    main_file: app_llm.py
+    artifacts:
+      - app_llm.py
+      - config/config.yaml
+      - params.yaml
+      - schema.yaml
+      - src/*
+      - environment.yml

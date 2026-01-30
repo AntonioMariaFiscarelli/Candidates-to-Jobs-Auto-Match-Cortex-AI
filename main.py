@@ -1,11 +1,11 @@
-from autoMatch import logger
-from autoMatch.utils.snowflake_utils import get_snowpark_session
+from src.autoMatch import logger
+from src.autoMatch.utils.snowflake_utils import get_snowpark_session
 
-from autoMatch.pipeline.stage_01_data_ingestion import DataIngestionTrainingPipeline
-from autoMatch.pipeline.stage_02_data_validation import DataValidationTrainingPipeline
-from autoMatch.pipeline.stage_03_data_transformation import DataTransformationTrainingPipeline
-from autoMatch.pipeline.stage_04_search_engine import SearchEngineTrainingPipeline
-from autoMatch.pipeline.stage_05_llm import LLMTrainingPipeline
+from src.autoMatch.pipeline.stage_01_data_ingestion import DataIngestionTrainingPipeline
+from src.autoMatch.pipeline.stage_02_data_validation import DataValidationTrainingPipeline
+from src.autoMatch.pipeline.stage_03_data_transformation import DataTransformationTrainingPipeline
+from src.autoMatch.pipeline.stage_04_search_engine import SearchEngineTrainingPipeline
+from src.autoMatch.pipeline.stage_05_llm import LLMTrainingPipeline
 
 import logging
 logging.getLogger("snowflake").setLevel(logging.WARNING)
@@ -49,7 +49,6 @@ except Exception as e:
    raise e
 
 '''
-
 STAGE_NAME = "Search Engine stage"
 try:
    logger.info(f">>>>>> stage {STAGE_NAME} started <<<<<<")
