@@ -27,12 +27,13 @@ class ConfigurationManager:
             database=config.database,
             schema=config.schema,
             input_table=config.input_table,
+            input_table_vacancy = config.input_table_vacancy,
             output_table = config.output_table,
+            output_table_vacancy = config.output_table_vacancy,
             italian_cities_file = config.italian_cities_file,
             output_table_italian_cities = config.output_table_italian_cities,
             columns = schema.columns,
-            start_date = schema.date_range.start_date,
-            end_date = schema.date_range.end_date,
+            columns_vacancy = schema.columns_vacancy,
             days_prior = schema.date_range.days_prior,
             desired_locations = schema.desired_locations,
             parttime_preferenza_perc = schema.parttime_preferenza_perc,
@@ -73,10 +74,14 @@ class ConfigurationManager:
             schema=config.schema,
             input_table=config.input_table,
             input_table_cleaned=config.input_table_cleaned,
+            input_table_vacancy = config.input_table_vacancy,
             input_table_italian_cities = config.input_table_italian_cities,
             output_table = config.output_table,
+            output_table_vacancy = config.output_table_vacancy,
             education_levels = schema.education_levels,
-            regions = schema.regions
+            regions = schema.regions,
+            turno_preferenza = schema.turno_preferenza,
+            parttime_preferenza_perc = schema.parttime_preferenza_perc
         )
 
         return data_transformation_config

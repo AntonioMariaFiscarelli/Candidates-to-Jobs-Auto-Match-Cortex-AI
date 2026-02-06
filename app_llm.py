@@ -122,14 +122,17 @@ def reset_filters():
         st.session_state[key] = value
 
 def set_default_values(vacancy_id):
-    df_vacancy = llm.extract_vacancy_info(session, vacancy_id)
-    row = df_vacancy.collect()[0]
+    df_vacancy = session.sql(f"""SELECT * FROM MPG_IT_AUTOMATCH_JOBORDER_FEATURES WHERE JOBORDERID = {vacancy_id}""")
+    #st.markdown("Valori estratti")
+    row = df_vacancy.first()
 
     #AZZERA TUTTI I CAMPI DI INPUT
 
     reset_filters()
-    if df_vacancy.count() == 1:
-        row = df_vacancy.collect()[0]
+    if row is None:
+        st.warning("❌ Vacancy non trovata. Controllare l'ID inserito.")
+    else:
+        #st.markdown("✅ Vacancy trovata. Imposto i valori di default in base ai dati estratti.")
         data = row.as_dict()
 
         assign_if_not_none("role", data.get("JOBTITLE"))
@@ -147,6 +150,7 @@ def set_default_values(vacancy_id):
         assign_list_if_not_none("skills_languages_opt", data.get("LANGUAGES"), languages)
         assign_string_if_not_none("skills_education_opt", data.get("EDUCATION"), education_levels)
         assign_if_not_none("skills_certifications_opt", data.get("CERTIFICATIONS"))
+        #st.markdown("✅ Valori impostati correttamente dai dati della vacancy.")
 
 def init_vacancy_input():
     col1, col2, col3 = st.columns([1, 1, 1])   # wider input, narrower button
@@ -172,12 +176,16 @@ def init_vacancy_input():
         st.experimental_rerun()
     
     if search:
-        if st.session_state.get("vacancy_id_raw"):
-            numeric_value = re.sub(r"\D", "", st.session_state.vacancy_id_raw)
-            st.session_state.vacancy_id = numeric_value
-            set_default_values(numeric_value)
-        else:
-            st.warning("Inserire un vacancy ID valido.")
+        with st.spinner("Recupero vacancy ed estrazione campi..."):
+            if st.session_state.get("vacancy_id_raw"):
+                numeric_value = re.sub(r"\D", "", st.session_state.vacancy_id_raw)
+                st.session_state.vacancy_id = numeric_value
+                if st.session_state.vacancy_id:
+                    set_default_values(numeric_value)
+                else:
+                    st.warning("Inserire un vacancy ID valido.")
+            else:
+                st.warning("Inserire un vacancy ID valido.")
 
 
 def init_role_loc_dist_age_input():
@@ -187,6 +195,7 @@ def init_role_loc_dist_age_input():
         st.text_input("Ruolo ricercato", 
                     #value="Magazziniere", 
                     key="role",
+                    on_change=lambda: None,
                     help="Esempio: Magazziniere")
 
     with col2:
@@ -219,7 +228,6 @@ def init_role_loc_dist_age_input():
                         # help="""Età massima. 
                         # Tutti i candidati di età superiore verrano scartati"""
                         )
-
 
 def bullhorn_fields_input():
     col1, col2, col3, col4 = st.columns(4)
@@ -270,14 +278,28 @@ def bullhorn_fields_input():
         )
 
     with col4:
+
+        raw_value = st.session_state.get("parttime_preferenza_perc", None)
+        try:
+            current_value = int(raw_value)
+        except:
+            current_value = None
+
+        # find closest
+        if current_value is not None:
+            closest_value = min(parttime_preferenza_perc, key=lambda x: abs(x - current_value))
+        else:
+            closest_value = parttime_preferenza_perc[0]
+
+        # Step 3: assign back
+        st.session_state.parttime_preferenza_perc = closest_value
+
         st.selectbox(
             "Seleziona % part-time",
             options=parttime_preferenza_perc,
             key="parttime_preferenza_perc",
             help="""I candidati con percentuale preferenza part-time inferiore a quella specificata verranno scartati"""
         )
-
-
 
 def init_skills_input():
     col1, col2 = st.columns(2)
@@ -378,7 +400,7 @@ def init_limit_input():
 
 
 def columns_to_show():
-    cols_default = ["candidateid", "first_name", "last_name", "location", "url"]
+    cols_default = ["score", "candidateid", "first_name", "last_name", "location", "url"]
     #cols.append("score_job")
 
     #if st.session_state.max_age:
@@ -424,7 +446,7 @@ def columns_to_show():
         cols.append("turno_preferenza")
     if bool(st.session_state.parttime_preferenza_perc):
         cols.append("parttime_preferenza_perc")
-    cols.append("score")
+    
 
     return cols_default, cols
 
@@ -573,6 +595,7 @@ def filter_candidates():
         df_candidates = df_candidates.with_column("TURNO_PREFERENZA", to_varchar(col("TURNO_PREFERENZA")))
 
     if st.session_state.parttime_preferenza_perc:
+        st.session_state.parttime_value = int(st.session_state.parttime_preferenza_perc)
         df_candidates = df_candidates.filter(
             (col("PARTTIME_PREFERENZA_PERC") >= st.session_state.parttime_preferenza_perc) | 
             (col("PARTTIME_PREFERENZA_PERC").is_null()) |

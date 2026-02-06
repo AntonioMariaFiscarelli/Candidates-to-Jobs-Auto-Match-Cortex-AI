@@ -4,7 +4,6 @@ from src.autoMatch.utils.snowflake_utils import get_snowpark_session
 from src.autoMatch.pipeline.stage_01_data_ingestion import DataIngestionTrainingPipeline
 from src.autoMatch.pipeline.stage_02_data_validation import DataValidationTrainingPipeline
 from src.autoMatch.pipeline.stage_03_data_transformation import DataTransformationTrainingPipeline
-from src.autoMatch.pipeline.stage_04_search_engine import SearchEngineTrainingPipeline
 from src.autoMatch.pipeline.stage_05_llm import LLMTrainingPipeline
 
 import logging
@@ -27,11 +26,12 @@ except Exception as e:
     raise e
 
 
+'''
 STAGE_NAME = "Data Validation stage"
 try:
    logger.info(f">>>>>> stage {STAGE_NAME} started <<<<<<") 
    data_validation = DataValidationTrainingPipeline()
-   data_validation.main(session)
+   data_validation.main(session)s
    logger.info(f">>>>>> stage {STAGE_NAME} completed <<<<<<\n\nx==========x")
 except Exception as e:
     logger.exception(e)
@@ -47,18 +47,8 @@ try:
 except Exception as e:
    logger.exception(e)
    raise e
+'''
 
-'''
-STAGE_NAME = "Search Engine stage"
-try:
-   logger.info(f">>>>>> stage {STAGE_NAME} started <<<<<<")
-   obj = SearchEngineTrainingPipeline()
-   obj.main(session)
-   logger.info(f">>>>>> stage {STAGE_NAME} completed <<<<<<\n\nx==========x")
-except Exception as e:
-   logger.exception(e)
-   raise e
-'''
 
 '''
 STAGE_NAME = "LLM stage"

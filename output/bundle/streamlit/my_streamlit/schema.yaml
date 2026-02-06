@@ -40,6 +40,8 @@ data_ingestion:
       - desired_location
       - parttime_preferenza_perc
       - turno_preferenza
+    columns_vacancy: ["joborderid", "dateadded", "jobtitle", "citta", "regione", "salary", "data_inizio_validita",
+                         "part_time_percent", "skill_list", "titoli_richiesti", "DESCRIZIONE_USO_INTERNO", "TESTO_PUBBLICAZIONE", "RICHIESTE_AGGIUNTIVE", "REQUISITI"]
     date_range:
       days_prior: 30
       start_date: 2025-10-01
@@ -86,9 +88,10 @@ data_validation:
 
 
 data_transformation:
-  education_levels:
-    *edu_levels
+  education_levels: *edu_levels
   regions: *reg
+  turno preferenza: *turno_pref
+  parttime_preferenza_perc: *parttime_pref
   
 app:
   default_inputs:

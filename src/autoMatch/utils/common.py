@@ -12,7 +12,8 @@ from typing import Any
 
 from snowflake.snowpark import functions as F
 
-from snowflake.snowpark.functions import col, trim, lower, when, lit, trim
+from snowflake.snowpark.functions import col, trim, lower, when, lit, trim, udf, parse_json
+from snowflake.snowpark.types import StringType, BooleanType
 
 import math
 
@@ -141,6 +142,52 @@ def validate_string(df, column_name):
             col(column_name)
             ).otherwise(lit(None))
         )
+    return df
+
+def validate_json(df, json_column):
+    
+    def build_clean_parsing_udf():
+        def clean(x: str) -> str:
+            if x is None:
+                return ''
+            x = x.lower().lstrip()
+            if x.startswith("```json"):
+                x = x[8:].lstrip()
+            x = x.replace('\n', ' ').replace('\t', ' ').replace('\\', '').strip()
+            x = ' '.join(x.split())
+            if x.endswith("```"):
+                x = x[:-3].rstrip()
+            if x.endswith("'") or x.endswith('"'):
+                x = x[:-1].rstrip()
+            return x
+
+        return udf(clean, return_type=StringType(), input_types=[StringType()])
+    clean_udf = build_clean_parsing_udf()
+
+    df = df.with_column(json_column, clean_udf(df[json_column]))
+
+    def build_is_valid_json_udf():
+        import json
+        def is_valid(text: str) -> bool:
+            if not text:
+                return False
+            try:
+                json.loads(text)
+                return True
+            except Exception:
+                return False
+
+        return udf(is_valid, return_type=BooleanType(), input_types=[StringType()])
+    
+    is_valid_json_udf = build_is_valid_json_udf()
+    df = df.with_column("is_valid_json", is_valid_json_udf(df[json_column]))
+    df = df.filter(col("is_valid_json") == True)
+    df = df.drop("is_valid_json")
+
+    df = df.with_column(json_column, parse_json(col(json_column)))
+
+    df = df.filter(df[json_column].is_not_null())
+
     return df
 
 #@ensure_annotations

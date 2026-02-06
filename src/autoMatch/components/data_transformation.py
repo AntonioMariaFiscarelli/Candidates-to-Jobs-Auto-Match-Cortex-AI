@@ -4,7 +4,8 @@ from snowflake.snowpark.types import StringType, BooleanType
 from snowflake.snowpark.functions import udf
 from datetime import date
 
-from src.autoMatch.utils.common import validate_string
+from src.autoMatch.utils.common import validate_string, validate_json
+
 
 from src.autoMatch.entity.config_entity import DataTransformationConfig
 
@@ -73,7 +74,8 @@ class DataTransformation:
         logger.info(f"Table {input_table} successfully cleaned")
 
         return df
-    
+
+
     def apply_ner_cortexai(self, session):
         """
         Reads input table cleaned
@@ -127,7 +129,7 @@ class DataTransformation:
                         languages (stringa, solo in Italiano),
                         certifications (stringa),
                         education (stringa, solo in Italiano, possibili valori (solo uno): {", ".join(education_levels)})',
-                        'Rispondi in formato JSON, senza testo extra, attieniti a questo esempio: 
+                        'Rispondi in formato JSON, senza testo extra, non usare virgolette all interno dei campi. attieniti a questo esempio: 
                         {{"age": 30, "date_of_birth": "1993-05-12", "location": "Milano", "zip_code": "20100", 
                         "last_job": "Data Engineer", "second_last_job": "Developer", "third_last_job": "Intern", 
                         "skills": "Python, SQL, Java",
@@ -148,47 +150,7 @@ class DataTransformation:
 
         df = session.sql(query)
 
-        def build_clean_parsing_udf():
-            def clean(x: str) -> str:
-                if x is None:
-                    return ''
-                x = x.lower().lstrip()
-                if x.startswith("```json"):
-                    x = x[8:].lstrip()
-                x = x.replace('\n', ' ').replace('\t', ' ').replace('\\', '').strip()
-                x = ' '.join(x.split())
-                if x.endswith("```"):
-                    x = x[:-3].rstrip()
-                if x.endswith("'") or x.endswith('"'):
-                    x = x[:-1].rstrip()
-                return x
-
-            return udf(clean, return_type=StringType(), input_types=[StringType()])
-        clean_udf = build_clean_parsing_udf()
-
-        df = df.with_column("ner_json", clean_udf(df["ner_json"]))
-
-        def build_is_valid_json_udf():
-            import json
-            def is_valid(text: str) -> bool:
-                if not text:
-                    return False
-                try:
-                    json.loads(text)
-                    return True
-                except Exception:
-                    return False
-
-            return udf(is_valid, return_type=BooleanType(), input_types=[StringType()])
-        
-        is_valid_json_udf = build_is_valid_json_udf()
-        df = df.with_column("is_valid_json", is_valid_json_udf(df["ner_json"]))
-        df = df.filter(col("is_valid_json") == True)
-        df = df.drop("is_valid_json")
-
-        df = df.with_column("ner_json", parse_json(col("ner_json")))
-
-        df = df.filter(df["ner_json"].is_not_null())
+        df = validate_json(df, "ner_json")
 
         df = df.with_columns(
             ["age", "date_of_birth", "location", "region", "country", "zip_code", "last_job", "second_last_job", "third_last_job", 
@@ -210,18 +172,6 @@ class DataTransformation:
                 col("ner_json")["education"].cast("STRING"),
             ]
         )
-
-        def validate_string(df, column_name):
-            df = df.with_column(
-                column_name,
-                when(
-                    (col(column_name).is_not_null()) &
-                    (trim(col(column_name)) != "") &
-                    (~lower(trim(col(column_name))).isin(["null", "none", "nan"])),
-                    col(column_name)
-                    ).otherwise(lit(None))
-                )
-            return df
         
         
         df = validate_string(df, "location")
@@ -235,9 +185,6 @@ class DataTransformation:
         df = validate_string(df, "languages")
         df = validate_string(df, "certifications")
         df = validate_string(df, "education")
-
-        from snowflake.snowpark.functions import regexp_replace
-
 
         # makes sure zip_code is a valid formato
         df = df.with_column(
@@ -286,6 +233,122 @@ class DataTransformation:
 
         return df
 
+    def apply_ner_vacancy(self, session):
+        """
+        Reads vacancy table
+        Performs Named Entity Recognition:
+
+        Function returns Snowflake dataframe
+        """
+
+        database = self.config.database
+        schema = self.config.schema
+        input_table_vacancy = self.config.input_table_vacancy
+
+        turno_preferenza = self.config.turno_preferenza
+        education_levels = self.config.education_levels
+        parttime_preferenza_perc = self.config.parttime_preferenza_perc
+
+        
+        texts = ["skills", "parttime_preferenza_perc", "education", "DESCRIZIONE_USO_INTERNO", "TESTO_PUBBLICAZIONE", "RICHIESTE_AGGIUNTIVE", "REQUISITI"]
+        labels = ["Skills richieste", "Percentuale part time", "Titoli di studio richiesti", "DESCRIZIONE USO INTERNO", "TESTO PUBBLICAZIONE", "RICHIESTE AGGIUNTIVE", "REQUISITI"]
+        
+        all_texts = []
+        for label, text in zip(labels, texts):
+            all_texts.append(f"""'{label}: ', {text} """)
+
+        concat_text = f"""CONCAT( {", '| ', ".join(all_texts)}  )"""
+
+
+        query = f"""
+        SELECT
+            joborderid,
+            dateadded,
+            jobtitle,
+            location,
+            region,
+            SNOWFLAKE.CORTEX.COMPLETE(
+                'claude-4-sonnet',
+                CONCAT(
+                    'Data la citta e/o regione, estrai la relativa nazione. Rispondi solo con il nome della nazione, in Italiano.',
+                    'Città: ', COALESCE(location, ''),
+                    'Regione: ', COALESCE(region, '')
+                )
+            ) AS country,
+            salary_low,
+            date_available,
+            {concat_text} AS description,
+            SNOWFLAKE.CORTEX.COMPLETE(
+                'claude-4-sonnet',
+                CONCAT(
+                    'Stai analizzando  una posizione lavorativa aperta, estrai i seguenti campi: 
+                    turno_preferenza (turni richiesti per la posizione. stringa, possibili valori (anche multipli): {", ".join(turno_preferenza)}), 
+                    parttime_preferenza_perc (percentuale di part time richiesta. stringa, scegli un solo valore tra questi: {", ".join(str(x) for x in parttime_preferenza_perc)}),
+                    skills (skills tecniche richieste (no soft skills). stringa, ad esempio Python, guida muletto, gestione progetti ecc),
+                    languages (lingue richieste, solo se richieste esplicitamente. stringa, ad esempio Inglese, Francese ecc )
+                    education (titolo di studio richiesto. stringa, solo in Italiano. Possibili valori (solo uno): {", ".join(education_levels)}),
+                    certifications (certificazioni richieste. stringa, ad esempio CISSP, EIPASS, ECDL, Patente B)',
+
+                    'Rispondi in formato JSON, senza testo extra, non usare virgolette all interno dei campi. attieniti a questo esempio: 
+                    {{"turno_preferenza": "Pomeriggio, Notte" ,
+                    "parttime_preferenza_perc": "30",
+                    "skills": "Python, SQL",
+                    "languages": "Italiano, Inglese",
+                    "education": "Diploma scuola superiore",
+                    "certifications": "CISSP, EIPASS, ECDL"}}. ',
+
+                    'Testo: ', {concat_text}
+                )
+            ) AS ner_json
+        FROM {database}.{schema}.{input_table_vacancy}
+        """
+
+
+        df = session.sql(query)
+
+        df = validate_json(df, "ner_json")
+
+        df = df.with_columns(
+            ["turno_preferenza", "parttime_preferenza_perc", "skills", "languages", "education", "certifications"],
+            [
+                col("ner_json")["turno_preferenza"].cast("STRING"),
+                col("ner_json")["parttime_preferenza_perc"].cast("STRING"),
+                col("ner_json")["skills"].cast("STRING"),
+                col("ner_json")["languages"].cast("STRING"), 
+                col("ner_json")["education"].cast("STRING"),
+                col("ner_json")["certifications"].cast("STRING"),
+            ]
+        )
+        
+        
+        df = validate_string(df, "turno_preferenza")
+        df = validate_string(df, "parttime_preferenza_perc")
+        df = validate_string(df, "skills")
+        df = validate_string(df, "languages")
+        df = validate_string(df, "education")
+        df = validate_string(df, "certifications")
+
+
+        # makes sure age is a reasonable value
+        df = df.with_column(
+            "parttime_preferenza_perc",
+            when(
+                (col("parttime_preferenza_perc") != "nan") &
+                (col("parttime_preferenza_perc").cast("INT").is_not_null()) &
+                (col("parttime_preferenza_perc").cast("INT") >= 0) &
+                (col("parttime_preferenza_perc").cast("INT") <= 100),
+                col("parttime_preferenza_perc").cast("INT")
+            ).otherwise(lit(None))
+        )
+
+        df = df.drop("ner_json")
+        df = df.drop("description")
+
+        logger.info(f"NER on {input_table_vacancy} table successful")
+
+        return df
+
+
     def apply_chatwa_extraction(self, session):
         """
         Reads input table cleaned
@@ -305,7 +368,7 @@ class DataTransformation:
                     CONCAT(
                         'Assegna True se il candidato ha risposto positivamente alla domanda "Sei disponibile a lavorare nel fine settimana?" altrimenti assegna False.
                         ️Rispondi solo con True o False. ',
-                        'Testo: ', chatwa
+                        'Testo: ', COALESCE(chatwa, '')
                     )
                 ) AS turno_preferenza_weekend
             FROM 
@@ -368,34 +431,37 @@ class DataTransformation:
             when(col("zip_code").isin(valid_zips), col("zip_code")).otherwise(lit(None))
             )
 
-        # If zip_code is missing and location is available, get the zip_code from italian_cities dataframe
+        # Rename conflicting columns in italian_cities
+        italian_cities_geo = italian_cities.select(
+            col("city_name"),
+            col("zip"),
+            col("latitude"),
+            col("longitude"),
+            col("province_ext")
+        )
+
+        # Join with italian_cities to get zip_code, latitude, longitude, and province_ext
         df = candidates.join(
-            italian_cities,
-            lower(candidates["location"]) == lower(italian_cities["city_name"]),
+            italian_cities_geo,
+            lower(candidates["location"]) == lower(italian_cities_geo["city_name"]),
             "left"
         )
+        
+        # Update zip_code if it's missing
         df = df.with_column(
             "zip_code",
             when(
                 col("zip_code").is_null(), col("zip") 
             ).otherwise(col("zip_code"))
         )
-        df = df.select(
-            *[col(c.name) for c in candidates.schema.fields],
-            )
-
-        # Given the candidate location, get (lat, long) data from italian_cities
-        df = df.join(
-            italian_cities,
-            lower(candidates["location"]) == lower(italian_cities["city_name"]),
-            how="left"
-        )
+        
+        # Select all original candidates columns plus geo data from italian_cities
         df = df.select(
             *[col(c.name) for c in candidates.schema.fields],
             col("latitude"),
             col("longitude"),
             col("province_ext"),
-            )
+        ).drop("zip")
         
         df = validate_string(df, "province_ext")
 

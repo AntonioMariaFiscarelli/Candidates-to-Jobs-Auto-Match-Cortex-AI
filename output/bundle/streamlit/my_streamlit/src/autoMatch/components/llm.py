@@ -579,17 +579,7 @@ class LLM:
 
     def extract_vacancy_info(self, session, vacancy_id):
         """
-        Creates custom prompt based recruiter requirements.
-        It creates a prompt for each mandatory skill (asks the LLM to reply with True or False if the candidate has the spefic skill or not)
-        It creates a prompt for each optional skill (asks the LLM to provide a score bases on the matching skills)
 
-        Returns a prompt dictionary:
-        prompts = {
-            'NEW_COLUMN' : [prompt, columns],
-            }
-        NEW_COLUMN: new column created, bool for mandatory skills and numeric for optional skills
-        prompt: prompt used for the Cortex AI request
-        columns: candidate column(s) name (or combination) provided to Cortex AI
         """
 
         llm_name = self.config.llm_name
@@ -662,19 +652,88 @@ class LLM:
                     'Regione: ', regione
                     )   
                 ) AS country,
+                --'Italia' AS country,
                 salary AS salary_low,
                 data_inizio_validita AS date_available,
                 COALESCE(CAST(part_time_percent AS STRING), '') AS parttime_preferenza_perc,
                 COALESCE(skill_list, '') AS skills,
                 COALESCE(titoli_richiesti, '') AS education,
-                COALESCE(DESCRIZIONE_USO_INTERNO, '') AS DESCRIZIONE_USO_INTERNO,
-                COALESCE(TESTO_PUBBLICAZIONE, '') AS TESTO_PUBBLICAZIONE,
-                COALESCE(RICHIESTE_AGGIUNTIVE, '') AS RICHIESTE_AGGIUNTIVE,
-                COALESCE(REQUISITI, '') AS REQUISITI
+                COALESCE(REGEXP_REPLACE( REGEXP_REPLACE(TRIM(DESCRIZIONE_USO_INTERNO), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', '' ), '') AS DESCRIZIONE_USO_INTERNO,
+                COALESCE(REGEXP_REPLACE( REGEXP_REPLACE(TRIM(TESTO_PUBBLICAZIONE), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', '' ), '') AS TESTO_PUBBLICAZIONE,
+                COALESCE(REGEXP_REPLACE( REGEXP_REPLACE(TRIM(RICHIESTE_AGGIUNTIVE), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', '' ), '') AS RICHIESTE_AGGIUNTIVE,
+                COALESCE(REGEXP_REPLACE( REGEXP_REPLACE(TRIM(REQUISITI), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', '' ), '') AS REQUISITI
             FROM {database}.{schema}.JOBORDER_CLEANED
             WHERE CAST(joborderid AS STRING) = '{vacancy_id}')
             """
         logger.info(f"Extracting vacancy info using model {llm_name}")
+
+
+        materialize_query = f"""
+        CREATE OR REPLACE TEMP TABLE TMP_VACANCY AS
+        SELECT
+            joborderid,
+            dateadded,
+            jobtitle,
+            citta AS location,
+            regione AS region,
+            salary AS salary_low,
+            data_inizio_validita AS date_available,
+            COALESCE(CAST(part_time_percent AS STRING), '') AS parttime_preferenza_perc,
+            COALESCE(skill_list, '') AS skills,
+            COALESCE(titoli_richiesti, '') AS education,
+            COALESCE(REGEXP_REPLACE(REGEXP_REPLACE(TRIM(DESCRIZIONE_USO_INTERNO), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', ''), '') AS DESCRIZIONE_USO_INTERNO,
+            COALESCE(REGEXP_REPLACE(REGEXP_REPLACE(TRIM(TESTO_PUBBLICAZIONE), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', ''), '') AS TESTO_PUBBLICAZIONE,
+            COALESCE(REGEXP_REPLACE(REGEXP_REPLACE(TRIM(RICHIESTE_AGGIUNTIVE), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', ''), '') AS RICHIESTE_AGGIUNTIVE,
+            COALESCE(REGEXP_REPLACE(REGEXP_REPLACE(TRIM(REQUISITI), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', ''), '') AS REQUISITI
+        FROM {database}.{schema}.JOBORDER_CLEANED
+        WHERE CAST(joborderid AS STRING) = '{vacancy_id}'
+        """
+
+        session.sql(materialize_query).collect()
+
+        query = f"""
+        SELECT
+            joborderid,
+            dateadded,
+            jobtitle,
+            location,
+            region,
+            SNOWFLAKE.CORTEX.COMPLETE(
+                'claude-4-sonnet',
+                CONCAT(
+                    'Estrai il paese dalla seguente città italiana. Rispondi solo con il nome del paese, in Italiano.',
+                    'Città: ', location,
+                    'Regione: ', region
+                )
+            ) AS country,
+            salary_low,
+            date_available,
+            {concat_text} AS description,
+            SNOWFLAKE.CORTEX.COMPLETE(
+                'claude-4-sonnet',
+                CONCAT(
+                    'Stai analizzando  una posizione lavorativa aperta, estrai i seguenti campi: 
+                    turno_preferenza (turni richiesti per la posizione. stringa, possibili valori (anche multipli): {", ".join(turno_preferenza)}), 
+                    parttime_preferenza_perc (percentuale di part time richiesta. stringa, possibili valori (solo uno): {", ".join(str(x) for x in parttime_preferenza_perc)}),
+                    skills (skills tecniche richieste (no soft skills). stringa, ad esempio Python, guida muletto, gestione progetti ecc),
+                    languages (lingue richieste, solo se richieste esplicitamente. stringa, ad esempio Inglese, Francese ecc )
+                    education (titolo di studio richiesto. stringa, solo in Italiano. Possibili valori (solo uno): {", ".join(education_levels)}),
+                    certifications (certificazioni richieste. stringa, ad esempio CISSP, EIPASS, ECDL, Patente B)',
+
+                    'Rispondi in formato JSON, senza testo extra, attieniti a questo esempio: 
+                    {{"turno_preferenza": "Pomeriggio, Notte" ,
+                    "parttime_preferenza_perc": "30%",
+                    "skills": "Python, SQL",
+                    "languages": "Italiano, Inglese",
+                    "education": "Diploma scuola superiore",
+                    "certifications": "CISSP, EIPASS, ECDL"}}. ',
+
+                    'Testo: ', {concat_text}
+                )
+            ) AS ner_json
+        FROM TMP_VACANCY
+        """
+
 
         df = session.sql(query)
         df = self.validate_json(df)

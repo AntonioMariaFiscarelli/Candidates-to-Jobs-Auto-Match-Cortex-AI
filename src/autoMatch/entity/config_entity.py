@@ -7,12 +7,13 @@ class DataIngestionConfig:
     database: str
     schema: str
     input_table: str
+    input_table_vacancy: str
     output_table: str
+    output_table_vacancy: str
     italian_cities_file: str
     output_table_italian_cities: str
     columns: dict
-    start_date: str
-    end_date: str
+    columns_vacancy: list[str]
     days_prior: int
     desired_locations: dict
     parttime_preferenza_perc: list[int]
@@ -35,10 +36,14 @@ class DataTransformationConfig:
     schema: str
     input_table: str
     input_table_cleaned: str
+    input_table_vacancy: str
     input_table_italian_cities: str
     output_table: str
+    output_table_vacancy: str
     education_levels: dict
     regions: list[str]
+    turno_preferenza: dict
+    parttime_preferenza_perc: list[int]
 
 
 @dataclass(frozen=True)

@@ -124,7 +124,53 @@ class DataIngestion:
 
         return df
     
+    def read_vacancy_table(self, session):
+        """
+        Reads input table
+        Function returns Snowflake dataframe
+        """
+        database = self.config.database
+        schema = self.config.schema
+        input_table_vacancy = self.config.input_table_vacancy
+        columns_vacancy = self.config.columns_vacancy
+        days_prior = self.config.days_prior
 
+        
+        df = session.sql(f"""
+                    WITH filtered_jc AS (
+                        SELECT {",".join(columns_vacancy)} , isopen, status, datelastmodified
+                        FROM {database}.{schema}.{input_table_vacancy} 
+                        WHERE isopen = 1 AND status = 'Accepting Candidates'
+                    )
+                    SELECT 
+                        DISTINCT jc.joborderid,
+                        jc.status,
+                        jc.datelastmodified,
+                        jc.dateadded,
+                        jc.jobtitle,
+                        jc.citta AS location,
+                        jc.regione AS region,
+                        jc.salary AS salary_low,
+                        jc.data_inizio_validita AS date_available,
+                        COALESCE(CAST(jc.part_time_percent AS STRING), '') AS parttime_preferenza_perc,
+                        COALESCE(jc.skill_list, '') AS skills,
+                        COALESCE(jc.titoli_richiesti, '') AS education,
+                        COALESCE(REGEXP_REPLACE(REGEXP_REPLACE(TRIM(jc.DESCRIZIONE_USO_INTERNO), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', ''), '') AS DESCRIZIONE_USO_INTERNO,
+                        COALESCE(REGEXP_REPLACE(REGEXP_REPLACE(TRIM(jc.TESTO_PUBBLICAZIONE), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', ''), '') AS TESTO_PUBBLICAZIONE,
+                        COALESCE(REGEXP_REPLACE(REGEXP_REPLACE(TRIM(jc.RICHIESTE_AGGIUNTIVE), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', ''), '') AS RICHIESTE_AGGIUNTIVE,
+                        COALESCE(REGEXP_REPLACE(REGEXP_REPLACE(TRIM(jc.REQUISITI), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', ''), '') AS REQUISITI
+                    FROM filtered_jc jc
+                    LEFT JOIN IT_DISCOVERY.CONSUMER_INT_MODEL.JOBSUBMISSION_CLEANED jsc
+                        ON jc.joborderid = jsc.joborderid
+                    WHERE 
+                        jc.datelastmodified >= DATEADD(day, -{days_prior}, CURRENT_TIMESTAMP())
+                        OR jsc.data_ultimo_cambio_status >= DATEADD(day, -{days_prior}, CURRENT_TIMESTAMP())
+                         """)
+        
+        logger.info(f"Table {input_table_vacancy} successfully read")
+
+        return df
+    
     def read_cities_file(self, session):
         """
         Reads XLSX file containing italian cities
@@ -192,5 +238,4 @@ class DataIngestion:
         df.write.save_as_table(table_name, mode="overwrite")
         logger.info(f"Table {table_name} successfully written")
 
-  
 

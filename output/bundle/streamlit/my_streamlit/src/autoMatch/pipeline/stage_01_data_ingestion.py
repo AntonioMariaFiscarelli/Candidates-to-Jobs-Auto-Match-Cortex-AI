@@ -15,10 +15,12 @@ class DataIngestionTrainingPipeline:
         config = ConfigurationManager()
         data_ingestion_config = config.get_data_ingestion_config()
         data_ingestion = DataIngestion(config=data_ingestion_config)
-        df = data_ingestion.read_table(session)
-        data_ingestion.write_table(df, data_ingestion.config.output_table)
-        df = data_ingestion.read_cities_file(session)
-        data_ingestion.write_table(df, data_ingestion.config.output_table_italian_cities)
+        #df = data_ingestion.read_table(session)
+        #data_ingestion.write_table(df, data_ingestion.config.output_table)
+        df = data_ingestion.read_vacancy_table(session)
+        data_ingestion.write_table(df, data_ingestion.config.output_table_vacancy)
+        #df = data_ingestion.read_cities_file(session)
+        #data_ingestion.write_table(df, data_ingestion.config.output_table_italian_cities)
 
 
     

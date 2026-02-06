@@ -1,9 +1,10 @@
 from src.autoMatch import logger
 import pandas as pd
 from snowflake.snowpark import Row
-from snowflake.snowpark.functions import col, dateadd, current_date, lit, coalesce, when, greatest, expr, split, listagg
+from snowflake.snowpark.functions import col, dateadd, current_date, lit, coalesce, when, greatest, expr, split, listagg, regexp_replace
 from snowflake.snowpark.types import StructType, StructField, StringType, FloatType
 
+from datetime import date, timedelta
 
 
 from src.autoMatch.entity.config_entity import DataIngestionConfig
@@ -25,17 +26,29 @@ class DataIngestion:
         desired_locations = self.config.desired_locations
         parttime_preferenza_perc = self.config.parttime_preferenza_perc
 
-        #df = session.table(f"{database}.{schema}.{input_table}")
-        #df = df.select([col(c) for c in columns])
+        # Compute cutoff date in Python (sargable filter)
+        cutoff_date = (date.today() - timedelta(days=days_prior)).isoformat()
         
-        candidate_df = session.sql(f"""
-                         SELECT {",".join(columns)} 
-                         FROM {database}.{schema}.{input_table} 
-                         """)
-        
-        candidate_df = candidate_df.filter(col("date_added") >= dateadd("day", lit(-days_prior), current_date()))
-        candidate_df = candidate_df.with_column("candidateid", col("candidateid").cast("string"))
-        
+        # Create a temporary table with only 100 rows from the view 
+        if(False):
+            input_table = f"candidate_materialized"
+            """
+            CREATE OR REPLACE TABLE IT_DISCOVERY.CONSUMER_INT_MODEL.candidate_materialized AS 
+            SELECT * FROM IT_DISCOVERY.CONSUMER_INT_MODEL.CANDIDATE_CLEANED -- this is your VIEW 
+            LIMIT 100
+            """
+
+        candidate_df = (
+            session.table(f"{database}.{schema}.{input_table}")
+            .filter(col("date_added") >= lit(cutoff_date))
+            .select([col(c) for c in columns])
+            .with_column("candidateid", col("candidateid").cast("string"))
+        )
+
+        #Removes very long meaningless sequences of characters
+        noise_pattern = r"([A-Za-z0-9+/]{200,}|[0-9A-F]{200,}|[^A-Za-z0-9\s]{30,})" 
+        candidate_df = candidate_df.with_column( "description", regexp_replace(col("description"), noise_pattern, "") )
+
         joboti_df = session.sql("""
         WITH note AS (
             SELECT *
@@ -78,7 +91,9 @@ class DataIngestion:
             )
             .select(candidate_df["*"], agg_df["CHATWA"])
         )
+        
 
+        #df = candidate_df
         #df = df.filter(col("CHATWA").is_not_null())
         
         case_parts = []
@@ -100,7 +115,7 @@ class DataIngestion:
         # Transform the dataframe
         df = df.with_column(
             "PARTTIME_PREFERENZA_PERC",
-            coalesce(col("PARTTIME_PREFERENZA_PERC"), lit("1%"))
+            coalesce(col("PARTTIME_PREFERENZA_PERC"), lit("100%"))
         )
 
         # Build expressions: if STRING_COL contains 'v', return int(v), else 0
@@ -121,10 +136,67 @@ class DataIngestion:
         )
 
         logger.info(f"Table {input_table} successfully read")
-
+        
         return df
     
 
+
+    def read_vacancy_table(self, session):
+        """
+        Reads input table
+        Function returns Snowflake dataframe
+        """
+        database = self.config.database
+        schema = self.config.schema
+        input_table_vacancy = self.config.input_table_vacancy
+        columns_vacancy = self.config.columns_vacancy
+        days_prior = self.config.days_prior
+
+        # Create a temporary table with only 100 rows from the view 
+        if(False):
+            input_table_vacancy = f"joborder_materialized"
+            """
+            CREATE OR REPLACE TABLE IT_DISCOVERY.CONSUMER_INT_MODEL.joborder_materialized AS 
+            SELECT * FROM IT_DISCOVERY.CONSUMER_INT_MODEL.JOBORDER_CLEANED -- this is your VIEW 
+            LIMIT 100
+            """
+
+        
+        df = session.sql(f"""
+                    WITH filtered_jc AS (
+                        SELECT {",".join(columns_vacancy)} , isopen, status, datelastmodified
+                        FROM {database}.{schema}.{input_table_vacancy} 
+                        WHERE isopen = 1 AND status = 'Accepting Candidates'
+                    )
+                    SELECT 
+                        DISTINCT jc.joborderid,
+                        jc.status,
+                        jc.datelastmodified,
+                        jc.dateadded,
+                        jc.jobtitle,
+                        jc.citta AS location,
+                        jc.regione AS region,
+                        jc.salary AS salary_low,
+                        jc.data_inizio_validita AS date_available,
+                        COALESCE(CAST(jc.part_time_percent AS STRING), '') AS parttime_preferenza_perc,
+                        COALESCE(jc.skill_list, '') AS skills,
+                        COALESCE(jc.titoli_richiesti, '') AS education,
+                        COALESCE(REGEXP_REPLACE(REGEXP_REPLACE(TRIM(jc.DESCRIZIONE_USO_INTERNO), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', ''), '') AS DESCRIZIONE_USO_INTERNO,
+                        COALESCE(REGEXP_REPLACE(REGEXP_REPLACE(TRIM(jc.TESTO_PUBBLICAZIONE), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', ''), '') AS TESTO_PUBBLICAZIONE,
+                        COALESCE(REGEXP_REPLACE(REGEXP_REPLACE(TRIM(jc.RICHIESTE_AGGIUNTIVE), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', ''), '') AS RICHIESTE_AGGIUNTIVE,
+                        COALESCE(REGEXP_REPLACE(REGEXP_REPLACE(TRIM(jc.REQUISITI), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', ''), '') AS REQUISITI
+                    FROM filtered_jc jc
+                    LEFT JOIN IT_DISCOVERY.CONSUMER_INT_MODEL.JOBSUBMISSION_CLEANED jsc
+                        ON jc.joborderid = jsc.joborderid
+                    WHERE 
+                        jc.datelastmodified >= DATEADD(day, -{days_prior}, CURRENT_TIMESTAMP())
+                        OR jsc.data_ultimo_cambio_status >= DATEADD(day, -{days_prior}, CURRENT_TIMESTAMP())
+                         """)
+        
+        logger.info(f"Table {input_table_vacancy} successfully read")
+
+        return df
+    
     def read_cities_file(self, session):
         """
         Reads XLSX file containing italian cities
@@ -166,6 +238,7 @@ class DataIngestion:
             (df["city_name"].str.lower().str.strip() != "nan")  # Remove "nan" string
         ]
 
+
         #These are necessary in order to avoid columns names qith quotes (e.g. "city" instead of city)
         rows = [Row(**row) for row in df.to_dict(orient="records")]
         schema = StructType([
@@ -183,6 +256,94 @@ class DataIngestion:
 
         return session.create_dataframe(rows, schema=schema)
     
+    def complete_cities_table(self, session):
+        """
+        Completes cities table with geocoding info from Cortex
+        Function returns Snowflake dataframe
+        """
+
+        output_table_italian_cities = self.config.output_table_italian_cities
+        string_columns = self.config.italian_cities_string_columns
+        numeric_columns = self.config.italian_cities_numeric_columns
+
+        from snowflake.snowpark.functions import call_function, concat, lower
+
+        df=session.table(output_table_italian_cities)
+
+        missing_df = df.filter(
+            col("latitude").is_null() |
+            col("longitude").is_null() |
+            (lower(col("latitude").cast("string")) == lit("nan")) |
+            (lower(col("longitude").cast("string")) == lit("nan")) |
+            (col("latitude").cast("string") == lit("NULL")) |
+            (col("longitude").cast("string") == lit("NULL")) |
+            (~col("latitude").cast("string").rlike(r"^-?\d{1,3}\.\d{1,10}$")) |
+            (~col("longitude").cast("string").rlike(r"^-?\d{1,3}\.\d{1,10}$"))
+        )
+
+
+        prompt = concat( 
+            lit("Restituisci la latitudine per la seguente città italiana:\n"), 
+
+            lit("Città: "), col("city_name"), lit("\n"), lit("Provincia: "), col("province_ext"), lit("\n"), lit("Regione: "), col("region"), lit("\n"), lit("Nazione: Italia\n\n"), 
+            lit("Rispondi SOLO con un numero nel formato seguente: 40.1234567)."),
+            lit("Se non conosci la latitudine della città, non restituire nulla") 
+            )
+        missing_df = missing_df.with_column("latitude",
+                            call_function(
+                                "SNOWFLAKE.CORTEX.COMPLETE",
+                                lit("claude-4-sonnet"),
+                                prompt
+                                )
+                            )
+
+        prompt = concat( 
+            lit("Restituisci la longitudine per la seguente città italiana:\n"), 
+            lit("Città: "), col("city_name"), lit("\n"), lit("Provincia: "), col("province"), lit("\n"), lit("Regione: "), col("region"), lit("\n"), lit("Nazione: Italia\n\n"), 
+            lit("Rispondi SOLO con un numero nel formato seguente: 10.1234567)."),
+            lit("Se non conosci la longitudine della città, non restituire nulla")  
+            )
+        missing_df = missing_df.with_column("longitude",
+                            call_function(
+                                "SNOWFLAKE.CORTEX.COMPLETE",
+                                lit("claude-4-sonnet"),
+                                prompt
+                                )
+                            )
+        
+        
+        missing_df = missing_df.with_column(
+            "latitude",
+            when(
+                col("latitude").cast("string").rlike(r"^-?\d{1,3}\.\d{1,10}$"),
+                col("latitude")
+            ).otherwise(lit(None))
+        ).with_column(
+            "longitude",
+            when(
+                col("longitude").cast("string").rlike(r"^-?\d{1,3}\.\d{1,10}$"),
+                col("longitude")
+            ).otherwise(lit(None))
+        )
+        
+
+        complete_df = df.filter(
+            ~(
+                col("latitude").is_null() |
+                col("longitude").is_null() |
+                (lower(col("latitude").cast("string")) == lit("nan")) |
+                (lower(col("longitude").cast("string")) == lit("nan")) |
+                (col("latitude").cast("string") == lit("NULL")) |
+                (col("longitude").cast("string") == lit("NULL")) |
+                (~col("latitude").cast("string").rlike(r"^-?\d{1,3}\.\d{1,10}$")) |
+                (~col("longitude").cast("string").rlike(r"^-?\d{1,3}\.\d{1,10}$"))
+            )
+        )
+
+        final_df = complete_df.union_by_name(missing_df)                   
+
+        return final_df 
+    
     def write_table(self, df, table_name = 'output_table'):
         """
         Writes table
@@ -192,5 +353,4 @@ class DataIngestion:
         df.write.save_as_table(table_name, mode="overwrite")
         logger.info(f"Table {table_name} successfully written")
 
-  
 
