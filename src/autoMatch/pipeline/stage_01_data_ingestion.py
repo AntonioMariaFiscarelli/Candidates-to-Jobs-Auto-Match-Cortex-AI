@@ -2,40 +2,57 @@ from src.autoMatch.config.configuration import ConfigurationManager
 from src.autoMatch.components.data_ingestion import DataIngestion
 from src.autoMatch import logger
 
+import snowflake.snowpark as sp
 from src.autoMatch.utils.snowflake_utils import get_snowpark_session
 
 
 STAGE_NAME = "Data Ingestion stage"
 
 class DataIngestionTrainingPipeline:
-    def __init__(self):
+    def __init__(self, deployment = False):
+        self.deployment = deployment
         pass
 
+
     def main(self, session):
-        config = ConfigurationManager()
+
+        if self.deployment:
+            config = ConfigurationManager(session)
+        else:
+            config = ConfigurationManager()
+            
         data_ingestion_config = config.get_data_ingestion_config()
         data_ingestion = DataIngestion(config=data_ingestion_config)
-        df = data_ingestion.read_table(session)
-        data_ingestion.write_table(df, data_ingestion.config.output_table)
+
+        df = data_ingestion.read_table_vacancy(session)
+        data_ingestion.write_table(df, data_ingestion.config.vacancy.output_table)
+        df = data_ingestion.clean_description_vacancy(session)
+        data_ingestion.write_table(df, data_ingestion.config.vacancy.output_table)
+        
+        
+        df = data_ingestion.read_table_candidate(session)
+        data_ingestion.write_table(df, data_ingestion.config.candidate.output_table)
+        df = data_ingestion.clean_description_candidate(session)
+        data_ingestion.write_table(df, data_ingestion.config.candidate.output_table)
+        
+        
         """
         df = data_ingestion.read_cities_file(session)
-        data_ingestion.write_table(df, data_ingestion.config.output_table_italian_cities)
+        data_ingestion.write_table(df, data_ingestion.config.italian_cities.output_table)
         df = data_ingestion.complete_cities_table(session)
-        data_ingestion.write_table(df, data_ingestion.config.output_table_italian_cities+'_complete')
+        data_ingestion.write_table(df, data_ingestion.config.italian_cities.output_table)
         """
-        df = data_ingestion.read_vacancy_table(session)
-        data_ingestion.write_table(df, data_ingestion.config.output_table_vacancy)
 
 
-
-    
-if __name__ == '__main__':
+def run_data_ingestion_pipeline(session: sp.Session) -> None:
+    STAGE_NAME = "Data Ingestion stage"
     try:
-        logger.info(f">>>>>> stage {STAGE_NAME} started <<<<<<")
-        session = get_snowpark_session()
-        obj = DataIngestionTrainingPipeline(session)
-        obj.main()
+        logger.info(f">>>>>> stage {STAGE_NAME} started <<<<<<") 
+        data_ingestion = DataIngestionTrainingPipeline(deployment=True)
+        data_ingestion.main(session)
         logger.info(f">>>>>> stage {STAGE_NAME} completed <<<<<<\n\nx==========x")
     except Exception as e:
         logger.exception(e)
         raise e
+    
+    

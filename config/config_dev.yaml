@@ -1,0 +1,57 @@
+artifacts_root: artifacts_b
+
+data_ingestion:  
+  root_dir: artifacts_b/data_ingestion
+  database: IT_DISCOVERY
+  schema: CONSUMER_INT_MODEL
+  candidate_tables:
+    input_table: CANDIDATE_CLEANED
+    output_table: MPG_IT_AUTOMATCH_CANDIDATE
+  vacancy_tables:
+    input_table: JOBORDER_CLEANED
+    output_table: MPG_IT_AUTOMATCH_JOBORDER
+  italian_cities:
+    input_file: italian_cities/italian_cities.xlsx
+    output_table: MPG_IT_AUTOMATCH_ITALIAN_CITIES
+
+data_validation:  
+  root_dir: artifacts_b/data_validation
+  database: IT_DISCOVERY
+  schema: CONSUMER_INT_MODEL
+  input_table: 
+    candidates: MPG_IT_AUTOMATCH_CANDIDATE
+    italian_cities: MPG_IT_AUTOMATCH_ITALIAN_CITIES
+  STATUS_FILE: artifacts_b/data_validation/status.txt
+
+data_transformation:  
+  root_dir: artifacts_b/data_transformation
+  database: IT_DISCOVERY
+  schema: CONSUMER_INT_MODEL
+  candidate_tables:
+    input_table: MPG_IT_AUTOMATCH_CANDIDATE
+    input_table_cleaned: MPG_IT_AUTOMATCH_CANDIDATE_CLEANED
+    output_table_cleaned: MPG_IT_AUTOMATCH_CANDIDATE_FEATURES_CLEANED
+    output_table: MPG_IT_AUTOMATCH_CANDIDATE_FEATURES
+  vacancy_tables:
+    input_table: MPG_IT_AUTOMATCH_JOBORDER
+    input_table_cleaned: MPG_IT_AUTOMATCH_JOBORDER_CLEANED
+    output_table_cleaned: MPG_IT_AUTOMATCH_JOBORDER_FEATURES_CLEANED
+    output_table: MPG_IT_AUTOMATCH_JOBORDER_FEATURES
+  input_table_italian_cities: MPG_IT_AUTOMATCH_ITALIAN_CITIES
+
+vacancy_search_table: &vac_t_search MPG_IT_AUTOMATCH_VACANCY_APP_TEMP
+
+
+automatch:
+  root_dir: artifacts_b/llm
+  database: IT_DISCOVERY
+  schema: CONSUMER_INT_MODEL
+  input_table: MPG_IT_AUTOMATCH_CANDIDATE_FEATURES
+  vacancy_search_table: *vac_t_search
+
+app:
+  root_dir: artifacts_b/app
+  database: IT_DISCOVERY
+  schema: CONSUMER_INT_MODEL
+  vacancy_table: MPG_IT_AUTOMATCH_JOBORDER_FEATURES
+  vacancy_search_table: *vac_t_search

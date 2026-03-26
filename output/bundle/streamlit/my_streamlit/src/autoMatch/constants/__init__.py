@@ -1,5 +1,7 @@
 """Paths of the project."""
+import os
 from pathlib import Path
+#from dotenv import load_dotenv
 
 #ROOT_PATH = Path(__file__).parent.parent
 ROOT_PATH = Path(__file__).parent.parent.parent.parent
@@ -13,6 +15,12 @@ PARAMS_FILE_PATH = Path("params.yaml")
 SCHEMA_FILE_PATH = Path("schema.yaml")
 """
 
-CONFIG_FILE_PATH = ROOT_PATH / "config" / "config.yaml"
+#load_dotenv()
+#env = os.getenv("ENV", "test") # default to test
+
+env = "test"
+env = "dev"
+
+CONFIG_FILE_PATH = ROOT_PATH / "config" / f"config_{env}.yaml"
 PARAMS_FILE_PATH = ROOT_PATH / "params.yaml"
 SCHEMA_FILE_PATH = ROOT_PATH / "schema.yaml"

@@ -384,11 +384,11 @@ class LLM:
             'MAND_SKILLS': [prompt_skills_mand, 'skills'],
             'SCORE_SKILLS': [prompt_skills_opt, 'skills'],
             'MAND_LANGUAGES': [prompt_languages_mand, 'languages'],
-            'SCORE_LANGUAGES': [prompt_languages_opt, 'languages'],
+            #'SCORE_LANGUAGES': [prompt_languages_opt, 'languages'],
             'MAND_EDUCATION': [prompt_education_mand, 'education'],
-            'SCORE_EDUCATION': [prompt_education_opt, 'education'],
+            #'SCORE_EDUCATION': [prompt_education_opt, 'education'],
             'MAND_CERTIFICATIONS': [prompt_certifications_mand, 'certifications'],
-            'SCORE_CERTIFICATIONS': [prompt_certifications_opt, 'certifications']
+            #'SCORE_CERTIFICATIONS': [prompt_certifications_opt, 'certifications']
             }
 
         logger.info("Prompt successfully created")
@@ -478,268 +478,278 @@ class LLM:
             df = df.with_column("SCORE", lit(0))
 
         df = df.filter(col("SCORE") > 0)
+        df = df.sort(col("SCORE").desc())
+
         logger.info(f"Run completed")
 
-        return df
+        return df.to_pandas()
 
-    def validate_json(self, df):
-    
-        def build_clean_parsing_udf():
-            def clean(x: str) -> str:
-                if x is None:
-                    return ''
-                x = x.lower().lstrip()
-                if x.startswith("```json"):
-                    x = x[8:].lstrip()
-                x = x.replace('\n', ' ').replace('\t', ' ').replace('\\', '').strip()
-                x = ' '.join(x.split())
-                if x.endswith("```"):
-                    x = x[:-3].rstrip()
-                if x.endswith("'") or x.endswith('"'):
-                    x = x[:-1].rstrip()
-                return x
-
-            return udf(clean, return_type=StringType(), input_types=[StringType()])
-        clean_udf = build_clean_parsing_udf()
-
-        df = df.with_column("ner_json", clean_udf(df["ner_json"]))
-
-        def build_is_valid_json_udf():
-            import json
-            def is_valid(text: str) -> bool:
-                if not text:
-                    return False
-                try:
-                    json.loads(text)
-                    return True
-                except Exception:
-                    return False
-
-            return udf(is_valid, return_type=BooleanType(), input_types=[StringType()])
-        
-        is_valid_json_udf = build_is_valid_json_udf()
-        df = df.with_column("is_valid_json", is_valid_json_udf(df["ner_json"]))
-        df = df.filter(col("is_valid_json") == True)
-        df = df.drop("is_valid_json")
-
-        df = df.with_column("ner_json", parse_json(col("ner_json")))
-
-        df = df.filter(df["ner_json"].is_not_null())
-
-        
-        df = df.with_columns(
-            ["turno_preferenza", "parttime_preferenza_perc", "skills", "languages", "education", "certifications"],
-            [
-                col("ner_json")["turno_preferenza"].cast("STRING"),
-                col("ner_json")["parttime_preferenza_perc"].cast("STRING"),
-                col("ner_json")["skills"].cast("STRING"),
-                col("ner_json")["languages"].cast("STRING"), 
-                col("ner_json")["education"].cast("STRING"),
-                col("ner_json")["certifications"].cast("STRING"),
-            ]
-        )
-
-        def validate_string(df, column_name):
-            df = df.with_column(
-                column_name,
-                when(
-                    (col(column_name).is_not_null()) &
-                    (trim(col(column_name)) != "") &
-                    (~lower(trim(col(column_name))).isin(["null", "none", "nan"])),
-                    col(column_name)
-                    ).otherwise(lit(None))
-                )
-            return df
-        
-        
-        df = validate_string(df, "turno_preferenza")
-        df = validate_string(df, "parttime_preferenza_perc")
-        df = validate_string(df, "skills")
-        df = validate_string(df, "languages")
-        df = validate_string(df, "education")
-        df = validate_string(df, "certifications")
-
-
-        # makes sure age is a reasonable value
-        df = df.with_column(
-            "parttime_preferenza_perc",
-            when(
-                (col("parttime_preferenza_perc") != "nan") &
-                (col("parttime_preferenza_perc").cast("INT").is_not_null()) &
-                (col("parttime_preferenza_perc").cast("INT") >= 0) &
-                (col("parttime_preferenza_perc").cast("INT") <= 100),
-                col("parttime_preferenza_perc").cast("INT")
-            ).otherwise(lit(None))
-        )
-
-        df = df.drop("ner_json")
-        df = df.drop("description")
-
-        return df
-
-    def extract_vacancy_info(self, session, vacancy_id):
+    def compute_score(self, session, candidates, joborderid):
         """
-
+        Queries the Vertex AI service based on the prompts
+        Returns candidate dataframe with extracted information
         """
-
-        llm_name = self.config.llm_name
+        from snowflake.snowpark.functions import col, call_function, coalesce, lit
 
         database = self.config.database
         schema = self.config.schema
         input_table = self.config.input_table
 
-        turno_preferenza = self.config.turno_preferenza
-        education_levels = self.config.education_levels
-        parttime_preferenza_perc = self.config.parttime_preferenza_perc
+        # Load candidates
+        candidates_df = session.table(f"{database}.{schema}.{input_table}_app")
 
-        open_texts = ["DESCRIZIONE_USO_INTERNO", "TESTO_PUBBLICAZIONE", "RICHIESTE_AGGIUNTIVE", "REQUISITI"]
-        #all_texts = ["skills_list", "part_time_percent", "titoli_richiesti", "DESCRIZIONE_USO_INTERNO", "TESTO_PUBBLICAZIONE", "RICHIESTE_AGGIUNTIVE", "REQUISITI"]
+        # Load vacancy (1 row, VECTOR columns preserved)
+        vacancy_df = (
+            session.table(f"{database}.{schema}.MPG_IT_AUTOMATCH_JOBORDER_FEATURES_NEW_APP")
+            .select("joborderid", col("skills_emb").alias("skills_emb_vac"), "jobtitle_emb")
+            .filter(col("joborderid") == lit(joborderid))
+        )
         
-        texts = ["skills", "parttime_preferenza_perc", "education", "DESCRIZIONE_USO_INTERNO", "TESTO_PUBBLICAZIONE", "RICHIESTE_AGGIUNTIVE", "REQUISITI"]
-        labels = ["Skills richieste", "Percentuale part time", "Titoli di studio richiesti", "DESCRIZIONE USO INTERNO", "TESTO PUBBLICAZIONE", "RICHIESTE AGGIUNTIVE", "REQUISITI"]
         
-        all_texts = []
-        for label, text in zip(labels, texts):
-            all_texts.append(f"""'{label}: ', {text} """)
 
-        concat_text = f"""CONCAT( {", '| ', ".join(all_texts)}  )"""
-        #concat_text = "CONCAT('skills: ', skills , 'descrizione uso interno: ', DESCRIZIONE_USO_INTERNO, ' | ', 'testo pubblicazione', TESTO_PUBBLICAZIONE)"
+        # CROSS JOIN (cheap because vacancy_df has 1 row)
+        joined = candidates_df.cross_join(vacancy_df)
 
-        query = f"""
-            SELECT
-                joborderid, dateadded, 
-                jobtitle, 
-                location, 
-                region,
-                country,
-                salary_low, 
-                date_available,
-                {concat_text} as description,
-                SNOWFLAKE.CORTEX.COMPLETE(
-                    'claude-4-sonnet',
-                    CONCAT(
-                        'Stai analizzando  una posizione lavorativa aperta, estrai i seguenti campi: 
-                        turno_preferenza (turni richiesti per la posizione. stringa, possibili valori (anche multipli): {", ".join(turno_preferenza)}), 
-                        parttime_preferenza_perc (percentuale di part time richiesta. stringa, possibili valori (solo uno): {", ".join(str(x) for x in parttime_preferenza_perc)}),
-                        skills (skills tecniche richieste (no soft skills). stringa, ad esempio Python, guida muletto, gestione progetti ecc),
-                        languages (lingue richieste, solo se richieste esplicitamente. stringa, ad esempio Inglese, Francese ecc )
-                        education (titolo di studio richiesto. stringa, solo in Italiano. Possibili valori (solo uno): {", ".join(education_levels)}),
-                        certifications (certificazioni richieste. stringa, ad esempio CISSP, EIPASS, ECDL, Patente B)',
-
-                        'Rispondi in formato JSON, senza testo extra, attieniti a questo esempio: 
-                        {{"turno_preferenza": "Pomeriggio, Notte" ,
-                        "parttime_preferenza_perc": "30%",
-                        "skills": "Python, SQL",
-                        "languages": "Italiano, Inglese",
-                        "education": "Diploma scuola superiore",
-                        "certifications": "CISSP, EIPASS, ECDL"}}. ',
-
-                        'Testo: ', {concat_text}
-                    )
-                ) AS ner_json
-            FROM 
-            (SELECT
-                joborderid,
-                dateadded,
-                jobtitle,
-                citta AS location,
-                regione AS region,
-                SNOWFLAKE.CORTEX.COMPLETE(
-                'claude-4-sonnet',
-                CONCAT(
-                    'Estrai il paese dalla seguente città italiana. Rispondi solo con il nome del paese, in Italiano.',
-                    'Città: ', citta,
-                    'Regione: ', regione
-                    )   
-                ) AS country,
-                --'Italia' AS country,
-                salary AS salary_low,
-                data_inizio_validita AS date_available,
-                COALESCE(CAST(part_time_percent AS STRING), '') AS parttime_preferenza_perc,
-                COALESCE(skill_list, '') AS skills,
-                COALESCE(titoli_richiesti, '') AS education,
-                COALESCE(REGEXP_REPLACE( REGEXP_REPLACE(TRIM(DESCRIZIONE_USO_INTERNO), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', '' ), '') AS DESCRIZIONE_USO_INTERNO,
-                COALESCE(REGEXP_REPLACE( REGEXP_REPLACE(TRIM(TESTO_PUBBLICAZIONE), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', '' ), '') AS TESTO_PUBBLICAZIONE,
-                COALESCE(REGEXP_REPLACE( REGEXP_REPLACE(TRIM(RICHIESTE_AGGIUNTIVE), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', '' ), '') AS RICHIESTE_AGGIUNTIVE,
-                COALESCE(REGEXP_REPLACE( REGEXP_REPLACE(TRIM(REQUISITI), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', '' ), '') AS REQUISITI
-            FROM {database}.{schema}.JOBORDER_CLEANED
-            WHERE CAST(joborderid AS STRING) = '{vacancy_id}')
-            """
-        logger.info(f"Extracting vacancy info using model {llm_name}")
-
-
-        materialize_query = f"""
-        CREATE OR REPLACE TEMP TABLE TMP_VACANCY AS
-        SELECT
-            joborderid,
-            dateadded,
-            jobtitle,
-            citta AS location,
-            regione AS region,
-            salary AS salary_low,
-            data_inizio_validita AS date_available,
-            COALESCE(CAST(part_time_percent AS STRING), '') AS parttime_preferenza_perc,
-            COALESCE(skill_list, '') AS skills,
-            COALESCE(titoli_richiesti, '') AS education,
-            COALESCE(REGEXP_REPLACE(REGEXP_REPLACE(TRIM(DESCRIZIONE_USO_INTERNO), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', ''), '') AS DESCRIZIONE_USO_INTERNO,
-            COALESCE(REGEXP_REPLACE(REGEXP_REPLACE(TRIM(TESTO_PUBBLICAZIONE), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', ''), '') AS TESTO_PUBBLICAZIONE,
-            COALESCE(REGEXP_REPLACE(REGEXP_REPLACE(TRIM(RICHIESTE_AGGIUNTIVE), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', ''), '') AS RICHIESTE_AGGIUNTIVE,
-            COALESCE(REGEXP_REPLACE(REGEXP_REPLACE(TRIM(REQUISITI), '\\s+', ' '), '[^A-Za-z0-9À-ÖØ-öø-ÿ .,;:!?()_''"-]', ''), '') AS REQUISITI
-        FROM {database}.{schema}.JOBORDER_CLEANED
-        WHERE CAST(joborderid AS STRING) = '{vacancy_id}'
-        """
-
-        session.sql(materialize_query).collect()
-
-        query = f"""
-        SELECT
-            joborderid,
-            dateadded,
-            jobtitle,
-            location,
-            region,
-            SNOWFLAKE.CORTEX.COMPLETE(
-                'claude-4-sonnet',
-                CONCAT(
-                    'Estrai il paese dalla seguente città italiana. Rispondi solo con il nome del paese, in Italiano.',
-                    'Città: ', location,
-                    'Regione: ', region
+        # Compute similarities
+        result_df = (
+            joined
+            .with_column(
+                "skills_similarity",
+                coalesce(
+                    call_function("VECTOR_COSINE_SIMILARITY", col("skills_emb"), col("skills_emb_vac")),
+                    lit(0)
                 )
-            ) AS country,
-            salary_low,
-            date_available,
-            {concat_text} AS description,
-            SNOWFLAKE.CORTEX.COMPLETE(
-                'claude-4-sonnet',
-                CONCAT(
-                    'Stai analizzando  una posizione lavorativa aperta, estrai i seguenti campi: 
-                    turno_preferenza (turni richiesti per la posizione. stringa, possibili valori (anche multipli): {", ".join(turno_preferenza)}), 
-                    parttime_preferenza_perc (percentuale di part time richiesta. stringa, possibili valori (solo uno): {", ".join(str(x) for x in parttime_preferenza_perc)}),
-                    skills (skills tecniche richieste (no soft skills). stringa, ad esempio Python, guida muletto, gestione progetti ecc),
-                    languages (lingue richieste, solo se richieste esplicitamente. stringa, ad esempio Inglese, Francese ecc )
-                    education (titolo di studio richiesto. stringa, solo in Italiano. Possibili valori (solo uno): {", ".join(education_levels)}),
-                    certifications (certificazioni richieste. stringa, ad esempio CISSP, EIPASS, ECDL, Patente B)',
-
-                    'Rispondi in formato JSON, senza testo extra, attieniti a questo esempio: 
-                    {{"turno_preferenza": "Pomeriggio, Notte" ,
-                    "parttime_preferenza_perc": "30%",
-                    "skills": "Python, SQL",
-                    "languages": "Italiano, Inglese",
-                    "education": "Diploma scuola superiore",
-                    "certifications": "CISSP, EIPASS, ECDL"}}. ',
-
-                    'Testo: ', {concat_text}
+            )
+            .with_column(
+                "last_job_similarity",
+                coalesce(
+                    call_function("VECTOR_COSINE_SIMILARITY", col("last_job_emb"), col("jobtitle_emb")),
+                    lit(0)
                 )
-            ) AS ner_json
-        FROM TMP_VACANCY
-        """
-
-
-        df = session.sql(query)
-        df = self.validate_json(df)
-
-        return df
+            )
+            .with_column(
+                "second_last_job_similarity",
+                coalesce(
+                    call_function("VECTOR_COSINE_SIMILARITY", col("second_last_job_emb"), col("jobtitle_emb")),
+                    lit(0)
+                )
+            )
+            .with_column(
+                "third_last_job_similarity",
+                coalesce(
+                    call_function("VECTOR_COSINE_SIMILARITY", col("third_last_job_emb"), col("jobtitle_emb")),
+                    lit(0)
+                )
+            )
+            .with_column(
+                "score",
+                40 * col("last_job_similarity")
+                + 30 * col("second_last_job_similarity")
+                + 20 * col("third_last_job_similarity")
+                + 5  * col("skills_similarity")
+            )
+            .filter(col("score") > 0)
+        )
+        return result_df
     
+    def compute_score(self, session, candidates_df, joborderid):
+        import numpy as np
+        import pandas as pd
+        from snowflake.snowpark.functions import col, lit, call_function
+
+
+        database = self.config.database
+        schema = self.config.schema
+        input_table = self.config.input_table
+
+        # ---------------------------------------------------------
+        # 1. Load candidates from Snowflake
+        # ---------------------------------------------------------
+        candidates = candidates_df.to_pandas()
+
+        #for col in ["SKILLS_EMB", "LAST_JOB_EMB", "SECOND_LAST_JOB_EMB", "THIRD_LAST_JOB_EMB"]:
+        #    candidates = candidates[candidates[col].apply(lambda x: isinstance(x, list) and len(x) == 1024)]
+
+        # ---------------------------------------------------------
+        # 2. Load vacancy embeddings (1 row)
+        # ---------------------------------------------------------
+        vacancy = (
+            #session.table(f"{database}.{schema}.MPG_IT_AUTOMATCH_JOBORDER_FEATURES_NEW")
+            session.table(f"{database}.{schema}.VACANCY_APP_TEMP")
+            #.filter(col("joborderid") == lit(joborderid))
+        )
+
+
+        ##############
+        cols_no_emb = [c for c in vacancy.columns if not c.lower().endswith("_emb")]
+        vacancy = vacancy.select([col(c) for c in cols_no_emb])
+
+        # 3. Clean text columns: replace NULL or '' with "Non disponibile"
+        vacancy = (
+            vacancy
+            .with_column(
+                "skills_clean",
+                when(col("skills").is_null() | (col("skills") == ""), lit("Non disponibile"))
+                .otherwise(col("skills"))
+            )
+            .with_column(
+                "jobtitle_clean",
+                when(col("jobtitle").is_null() | (col("jobtitle") == ""), lit("Non disponibile"))
+                .otherwise(col("jobtitle"))
+            )
+        )
+        # 4. Add new embeddings using Cortex
+        vacancy = (
+            vacancy
+            .with_column(
+                "skills_emb",
+                call_function(
+                    "SNOWFLAKE.CORTEX.AI_EMBED_1024",
+                    lit("multilingual-e5-large"),
+                    col("skills_clean")
+                )
+            )
+            .with_column(
+                "jobtitle_emb",
+                call_function(
+                    "SNOWFLAKE.CORTEX.AI_EMBED_1024",
+                    lit("multilingual-e5-large"),
+                    col("jobtitle_clean")
+                )
+            )
+        )
+
+        clean_cols = [c for c in vacancy.columns if c.lower().endswith("_clean")] 
+        vacancy = vacancy.drop(clean_cols)
+
+        ################
+
+        vacancy = (
+            vacancy
+            .select("skills_emb", "jobtitle_emb")
+            .to_pandas()
+            .iloc[0]
+        )
+        
+        skills_emb_vac = np.array(vacancy["SKILLS_EMB"])
+        jobtitle_emb_vac = np.array(vacancy["JOBTITLE_EMB"])
+
+        print("\nSKILLS EMB VAC")
+        print(skills_emb_vac.shape)
+        print("JOBTITLE EMB VAC")
+        print(jobtitle_emb_vac.shape)
+
+        # ---------------------------------------------------------
+        # 3. Convert candidate embeddings to NumPy matrices
+        # ---------------------------------------------------------
+        skills_mat = np.vstack(candidates["SKILLS_EMB"].apply(np.array).values)
+        last_job_mat = np.vstack(candidates["LAST_JOB_EMB"].apply(np.array).values)
+        second_last_mat = np.vstack(candidates["SECOND_LAST_JOB_EMB"].apply(np.array).values)
+        third_last_mat = np.vstack(candidates["THIRD_LAST_JOB_EMB"].apply(np.array).values)
+
+        print("\nCAND")
+        print(f"{skills_mat.shape} {last_job_mat.shape} {second_last_mat.shape} {third_last_mat.shape}")
+
+        # ---------------------------------------------------------
+        # 4. Fast cosine similarity (vectorized), normalized do [0, 1]
+        # ---------------------------------------------------------
+        def cosine_similarity_matrix(mat, vec):
+            vec_norm = np.linalg.norm(vec)
+            mat_norm = np.linalg.norm(mat, axis=1)
+            cos = (mat @ vec) / (mat_norm * vec_norm + 1e-9)
+            return cos#(cos-cos.min()) / (cos.max() - cos.min() + 1e-9)
+
+        
+        def minmax(x, xmin, xmax):
+            return (x - xmin) / (xmax - xmin + 1e-9)
+        
+
+
+
+        # ---------------------------------------------------------
+        # 5. Compute all similarities
+        # ---------------------------------------------------------
+
+
+        sim1 = cosine_similarity_matrix(last_job_mat, jobtitle_emb_vac)
+        sim2 = cosine_similarity_matrix(second_last_mat, jobtitle_emb_vac)
+        sim3 = cosine_similarity_matrix(third_last_mat, jobtitle_emb_vac)
+        sim4 = cosine_similarity_matrix(skills_mat, skills_emb_vac)
+
+        """
+        jmin = min(sim1.min(), sim2.min(), sim3.min())
+        jmax = min(sim1.max(), sim2.max(), sim3.max())
+
+        print(jmin, jmax)
+        sim1 = minmax(sim1, jmin, jmax)
+        sim2 = minmax(sim2, jmin, jmax)
+        sim3 = minmax(sim3, jmin, jmax)
+
+        jmin = np.min(sim4)
+        jmax = np.max(sim4)
+        sim4 = minmax(sim4, jmin, jmax)
+        print(jmin, jmax)
+        """ 
+
+        sim1 = minmax(sim1, sim1.min(), 1)#sim1.max())
+        sim2 = minmax(sim2, sim2.min(), 1)# sim2.max())
+        sim3 = minmax(sim3, sim3.min(), 1)# sim3.max())
+        sim4 = minmax(sim4, sim4.min(), 1)# sim4.max())
+
+        last_job_sim = sim1
+        second_last_sim = sim2
+        third_last_sim = sim3
+        skills_sim = sim4
+
+        print("\nSIM")
+        print(f"{skills_sim.shape} {last_job_sim.shape} {second_last_sim.shape} {third_last_sim.shape}")
+
+        # ---------------------------------------------------------
+        # 6. Weighted score
+        # ---------------------------------------------------------
+        score = (
+            50 * last_job_sim +
+            25 * second_last_sim +
+            15 * third_last_sim +
+            5 * skills_sim
+        )
+
+        # ---------------------------------------------------------
+        # 7. Build result DataFrame
+        # ---------------------------------------------------------
+        result = candidates.copy()
+        #result["skills_similarity"] = skills_sim
+        #result["last_job_similarity"] = last_job_sim
+        #result["second_last_job_similarity"] = second_last_sim
+        #result["third_last_job_similarity"] = third_last_sim
+        result["SCORE"] = score
+
+        print("\nRESULT")
+        print(result.shape)
+
+        # Filter and sort 
+        result_pdf = result[result["SCORE"] > 0] 
+        result_pdf["SCORE"] = result_pdf["SCORE"].round(0).astype(int)
+        result_pdf = result_pdf.sort_values("SCORE", ascending=False) 
+
+        print("\nRESULT PDF")
+        print(result_pdf.shape)
+        # --------------------------------------------------------- 
+        # # 8. Write back to Snowflake and return Snowpark DataFrame 
+        # # --------------------------------------------------------- 
+        """
+        temp_table = "TEMP_TOP_CANDIDATES" 
+        session.write_pandas( result_pdf, temp_table, auto_create_table=True, overwrite=True ) 
+        # Return a Snowflake DataFrame 
+        result_df = session.table(temp_table) 
+
+        print("\nRESULT DF")
+        print(result_df.count())
+        print(len(result_df.columns))
+        """
+        return result_pdf.head(100)
+
+
     def write_table(self, df, table_name = 'output_table'):
         """
         Writes table

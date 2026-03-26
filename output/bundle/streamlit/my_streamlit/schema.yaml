@@ -1,8 +1,9 @@
+days_prior: &days_p 30
 
 languages: &langs ["Inglese", "Italiano", "Spagnolo", "Francese", "Tedesco", "Portoghese", "Cinese", "Giapponese", "Coreano", "Russo", "Arabo", "Olandese", "Svedese", "Polacco", "Turco", "Urdu", "Bangalese"]
 
 regions: &reg ["Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagna", "Friuli-Venezia Giulia", "Lazio", "Liguria", "Lombardia", "Marche",
-  "Molise", "Piemonte", "Puglia", "Sardegna", "Sicilia", "Toscana", "Trentino-Alto Adige", "Umbria", "Valle d'Aosta", "Veneto"
+  "Molise", "Piemonte", "Puglia", "Sardegna", "Sicilia", "Toscana", "Trentino-Alto Adige", "Umbria", "Valle d Aosta", "Veneto"
 ]
 
 education_levels: &edu_levels
@@ -43,7 +44,7 @@ data_ingestion:
     columns_vacancy: ["joborderid", "dateadded", "jobtitle", "citta", "regione", "salary", "data_inizio_validita",
                          "part_time_percent", "skill_list", "titoli_richiesti", "DESCRIZIONE_USO_INTERNO", "TESTO_PUBBLICAZIONE", "RICHIESTE_AGGIUNTIVE", "REQUISITI"]
     date_range:
-      days_prior: 30
+      days_prior: *days_p
       start_date: 2025-10-01
       end_date: 2025-12-12
     cities_file_columns:
@@ -92,6 +93,8 @@ data_transformation:
   regions: *reg
   turno preferenza: *turno_pref
   parttime_preferenza_perc: *parttime_pref
+  days_prior: *days_p
+
   
 app:
   default_inputs:
@@ -114,6 +117,7 @@ app:
     skills_education_opt: ""
     skills_certifications_mand: ""
     skills_certifications_opt: ""
+    vacancy_id_raw: ""
 
 
 llm:

@@ -1,23 +1,33 @@
 from src.autoMatch.constants import *
-from src.autoMatch.utils.common import read_yaml, create_directories
+from src.autoMatch.utils.common import read_yaml, read_yaml_sp, create_directories
 from src.autoMatch import logger
 
-from src.autoMatch.entity.config_entity import DataIngestionConfig, DataValidationConfig, DataTransformationConfig, SearchEngineConfig, LLMConfig, AppConfig
+from src.autoMatch.entity.config_entity import DataIngestionConfig, CandidateIngestionConfig, VacancyIngestionConfig, ItalianCitiesIngestionConfig
+from src.autoMatch.entity.config_entity import DataTransformationConfig, CandidateTransformationConfig, VacancyTransformationConfig, DeploymentConfig
+from src.autoMatch.entity.config_entity import AutomatchConfig, AppConfig
 
 class ConfigurationManager:
     def __init__(
         self,
+        session = None,
         config_filepath = CONFIG_FILE_PATH,
         params_filepath = PARAMS_FILE_PATH,
-        schema_filepath = SCHEMA_FILE_PATH):
+        schema_filepath = SCHEMA_FILE_PATH,
+        stage = STAGE_NAME):
 
-        self.config = read_yaml(config_filepath)
-        self.params = read_yaml(params_filepath)
-        self.schema = read_yaml(schema_filepath)
+        if(not session):
+            self.config = read_yaml(config_filepath)
+            self.params = read_yaml(params_filepath)
+            self.schema = read_yaml(schema_filepath)
+        else:
+            self.config = read_yaml_sp(session, stage, CONFIG_FILE_PATH) #"config_test.yaml")
+            self.params = read_yaml_sp(session, stage, PARAMS_FILE_PATH) 
+            self.schema = read_yaml_sp(session, stage, SCHEMA_FILE_PATH) 
+            
 
-        create_directories([self.config.artifacts_root])
+        #create_directories([self.config.artifacts_root])
 
-    
+
     def get_data_ingestion_config(self) -> DataIngestionConfig:
         config = self.config.data_ingestion
         schema = self.schema.data_ingestion
@@ -26,100 +36,127 @@ class ConfigurationManager:
             root_dir=config.root_dir,
             database=config.database,
             schema=config.schema,
-            input_table=config.input_table,
-            input_table_vacancy = config.input_table_vacancy,
-            output_table = config.output_table,
-            output_table_vacancy = config.output_table_vacancy,
-            italian_cities_file = config.italian_cities_file,
-            output_table_italian_cities = config.output_table_italian_cities,
-            columns = schema.columns,
-            columns_vacancy = schema.columns_vacancy,
-            days_prior = schema.date_range.days_prior,
+
+            candidate=CandidateIngestionConfig(
+                input_table=config.candidate_tables.input_table,
+                output_table=config.candidate_tables.output_table,
+                columns = schema.candidate.columns,
+                days_prior = schema.candidate.days_prior
+            ),
+
+            vacancy=VacancyIngestionConfig(
+                input_table=config.vacancy_tables.input_table,
+                output_table=config.vacancy_tables.output_table,
+                columns = schema.vacancy.columns,
+                days_prior = schema.vacancy.days_prior
+
+            ),
+            italian_cities=ItalianCitiesIngestionConfig(
+                input_file=config.italian_cities.input_file,
+                output_table=config.italian_cities.output_table,
+                string_columns = schema.italian_cities.string_columns,
+                numeric_columns = schema.italian_cities.numeric_columns,
+            ),
+
             desired_locations = schema.desired_locations,
             parttime_preferenza_perc = schema.parttime_preferenza_perc,
-            italian_cities_string_columns = schema.cities_file_columns.string_columns,
-            italian_cities_numeric_columns = schema.cities_file_columns.numeric_columns,
+            max_tokens=schema.max_tokens
         )
 
         return data_ingestion_config
-    
 
-    def get_data_validation_config(self) -> DataValidationConfig:
-        config = self.config.data_validation
-        schema = self.schema.data_validation
-
-        create_directories([config.root_dir])
-
-        data_validation_config = DataValidationConfig(
-            root_dir=config.root_dir,
-            database=config.database,
-            schema=config.schema,
-            input_table=config.input_table,
-            table_schema=schema.table_schema,
-            status_file = config.STATUS_FILE
-        )
-
-        return data_validation_config
-    
 
     def get_data_transformation_config(self) -> DataTransformationConfig:
         config = self.config.data_transformation
         schema = self.schema.data_transformation
+        params = self.params.data_transformation
 
-        create_directories([config.root_dir])
+        #create_directories([config.root_dir])
 
         data_transformation_config = DataTransformationConfig(
             root_dir=config.root_dir,
             database=config.database,
             schema=config.schema,
-            input_table=config.input_table,
-            input_table_cleaned=config.input_table_cleaned,
-            input_table_vacancy = config.input_table_vacancy,
-            input_table_italian_cities = config.input_table_italian_cities,
-            output_table = config.output_table,
-            output_table_vacancy = config.output_table_vacancy,
-            education_levels = schema.education_levels,
-            regions = schema.regions,
-            turno_preferenza = schema.turno_preferenza,
-            parttime_preferenza_perc = schema.parttime_preferenza_perc
+
+            candidate=CandidateTransformationConfig(
+                input_table=config.candidate_tables.input_table,
+                input_table_cleaned=config.candidate_tables.input_table_cleaned,
+                output_table_cleaned=config.candidate_tables.output_table_cleaned,
+                output_table=config.candidate_tables.output_table,
+                days_prior=schema.candidate.days_prior,
+                ner_columns=schema.candidate.ner_columns,
+                ner_features=schema.candidate.ner_features,
+                emb_columns=schema.candidate.emb_columns,
+                geo_columns=schema.candidate.geo_columns,
+                candidate_log_table=self.config.candidate_log_table,
+            ),
+
+            vacancy=VacancyTransformationConfig(
+                input_table=config.vacancy_tables.input_table,
+                input_table_cleaned=config.vacancy_tables.input_table_cleaned,
+                output_table_cleaned=config.vacancy_tables.output_table_cleaned,
+                output_table=config.vacancy_tables.output_table,
+                days_prior=schema.vacancy.days_prior,
+                ner_columns=schema.vacancy.ner_columns,
+                ner_features=schema.vacancy.ner_features,
+                emb_columns=schema.vacancy.emb_columns,
+                vacancy_log_table=self.config.vacancy_log_table
+            ),
+
+            llm_model=params.llm_model,
+
+            input_table_italian_cities=config.input_table_italian_cities,
+
+            education_levels=schema.education_levels,
+            regions=schema.regions,
+            turno_preferenza=schema.turno_preferenza,
+            parttime_preferenza_perc=schema.parttime_preferenza_perc
         )
 
         return data_transformation_config
-    
 
-    def get_search_engine_config(self) -> SearchEngineConfig:
-        config = self.config.search_engine
-        schema = self.schema.search_engine
+    def get_deployment_config(self) -> DeploymentConfig:
+        config = self.config.deployment
+        params = self.params.deployment
 
-        create_directories([config.root_dir])
+        #create_directories([config.root_dir])
 
-        search_engine_config = SearchEngineConfig(
+        deployment_config = DeploymentConfig(
             root_dir=config.root_dir,
             database=config.database,
             schema=config.schema,
-            input_table=config.input_table,
-            search_service=config.search_service,
-            search_columns=schema.search_columns,
-            attributes_columns = schema.attributes_columns,
-            columns = schema.columns
+            warehouse=config.warehouse,
+            config_dir=config.config_dir,
+            stage_sp=config.stage_sp,
+            data_ingestion_sp=config.data_ingestion_sp,
+            data_transformation_sp=config.data_transformation_sp,
+            data_ingestion_task=config.data_ingestion_task,
+            data_transformation_task=config.data_transformation_task,
+            candidate_log_table=self.config.candidate_log_table,
+            vacancy_log_table=self.config.vacancy_log_table,
+            runtime_version=params.runtime_version,
+            data_ingestion_imports=params.data_ingestion_imports,
+            data_ingestion_packages=params.data_ingestion_packages,
+            data_transformation_imports=params.data_transformation_imports,
+            data_transformation_packages=params.data_transformation_packages
         )
 
-        return search_engine_config
-    
+        return deployment_config
 
-    def get_llm_config(self) -> LLMConfig:
-        config = self.config.llm
-        schema = self.schema.llm
-        params = self.params.llm
+    def get_automatch_config(self) -> AutomatchConfig:
+        config = self.config.automatch
+        schema = self.schema.automatch
+        params = self.params.automatch
 
-        create_directories([config.root_dir])
+        #create_directories([config.root_dir])
 
-        llm_config = LLMConfig(
+        automatch_config = AutomatchConfig(
             root_dir=config.root_dir,
             database=config.database,
             schema=config.schema,
             input_table=config.input_table,
-            llm_name=params.llm_name,
+            vacancy_search_table=config.vacancy_search_table,
+            llm_model=params.llm_model,
             columns=schema.columns,
             role_mappings = schema.role_mappings,
             languages = schema.languages,
@@ -129,19 +166,21 @@ class ConfigurationManager:
             parttime_preferenza_perc = schema.parttime_preferenza_perc
         )
 
-        return llm_config
+        return automatch_config
 
 
     def get_app_config(self) -> AppConfig:
         config = self.config.app
         schema = self.schema.app
 
-        create_directories([config.root_dir])
+        #create_directories([config.root_dir])
 
         app_config = AppConfig(
             root_dir=config.root_dir,
             database=config.database,
             schema=config.schema,
+            vacancy_table=config.vacancy_table,
+            vacancy_search_table=config.vacancy_search_table,
             default_inputs=schema.default_inputs
         )
 

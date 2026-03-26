@@ -39,3 +39,23 @@ def get_snowpark_session() -> sp.Session:
         session.sql(f"ALTER SESSION SET {param_key} = '{param_value}'")
 
     return cast(sp.Session, session)
+
+
+def generate_create_stage_command(
+    stage: str,
+    *,
+    is_permanent: bool = False,
+    overwrite = False
+) -> str:
+    """
+    Generate a Snowflake command to create a stage.
+    Examples:
+    CREATE STAGE MPG_IT_AUTOMATCHCH_STAGE_SP
+    CREATE OR REPLACE STAGE MPG_IT_AUTOMATCHCH_STAGE_SP
+    CREATE OR REPLACE STAGE IF NOT EXISTS MPG_IT_AUTOMATCHCH_STAGE_SP
+    CREATE OR REPLACE TEMPORARY STAGE IF NOT EXISTS MPG_IT_AUTOMATCHCH_STAGE_SP
+
+    """
+    return f"""
+        CREATE {'OR REPLACE ' if overwrite else ''} {'TEMPORARY ' if not is_permanent else ''} STAGE {'' if overwrite else 'IF NOT EXISTS '} {stage.strip('@')};
+    """

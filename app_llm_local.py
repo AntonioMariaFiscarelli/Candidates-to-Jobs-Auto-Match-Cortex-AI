@@ -11,7 +11,7 @@ from snowflake.snowpark.functions import col, lit, concat, to_varchar, expr, cou
 import re
 
 from src.autoMatch.config.configuration import ConfigurationManager
-from src.autoMatch.components.llm import LLM
+from src.autoMatch.components.automatch import LLM
 
 
 

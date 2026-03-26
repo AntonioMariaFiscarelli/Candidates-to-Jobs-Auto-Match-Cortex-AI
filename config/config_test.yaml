@@ -1,0 +1,64 @@
+artifacts_root: artifacts_b
+
+candidate_log_table: MPG_IT_AUTOMATCH_CANDIDATE_LOG
+vacancy_log_table: MPG_IT_AUTOMATCH_JOBORDER_LOG
+
+data_ingestion:  
+  root_dir: artifacts_b/data_ingestion
+  database: IT_DISCOVERY
+  schema: CONSUMER_INT_MODEL
+  candidate_tables:
+    input_table: CANDIDATE_CLEANED
+    output_table: MPG_IT_AUTOMATCH_CANDIDATE_TEST
+  vacancy_tables:
+    input_table: JOBORDER_CLEANED
+    output_table: MPG_IT_AUTOMATCH_JOBORDER_TEST
+  italian_cities:
+    input_file: italian_cities/italian_cities.xlsx
+    output_table: MPG_IT_AUTOMATCH_ITALIAN_CITIES_TEST
+
+data_transformation:  
+  root_dir: artifacts_b/data_transformation
+  database: IT_DISCOVERY
+  schema: CONSUMER_INT_MODEL
+  candidate_tables:
+    input_table: MPG_IT_AUTOMATCH_CANDIDATE_TEST
+    input_table_cleaned: MPG_IT_AUTOMATCH_CANDIDATE_CLEANED_TEST
+    output_table_cleaned: MPG_IT_AUTOMATCH_CANDIDATE_FEATURES_CLEANED_TEST
+    output_table: MPG_IT_AUTOMATCH_CANDIDATE_FEATURES_TEST
+  vacancy_tables:
+    input_table: MPG_IT_AUTOMATCH_JOBORDER_TEST
+    input_table_cleaned: MPG_IT_AUTOMATCH_JOBORDER_CLEANED_TEST
+    output_table_cleaned: MPG_IT_AUTOMATCH_JOBORDER_CLEANED_FEATURES_TEST
+    output_table: MPG_IT_AUTOMATCH_JOBORDER_FEATURES_TEST
+  input_table_italian_cities: MPG_IT_AUTOMATCH_ITALIAN_CITIES_TEST
+
+deployment:
+  root_dir: artifacts_b/data_transformation
+  database: IT_DISCOVERY
+  schema: CONSUMER_INT_MODEL
+  warehouse: IT_NONPROD_CTDM_COMPUTE_WH
+  config_dir: config
+  stage_sp: MPG_IT_AUTOMATCH_STAGE_SP
+  data_ingestion_sp: DataIngestionSP
+  data_transformation_sp: DataTransformationSP
+  data_ingestion_task: DataIngestionTask
+  data_transformation_task: DataTransformationTask
+
+vacancy_search_table: &vac_t_search MPG_IT_AUTOMATCH_VACANCY_APP_TEMP
+
+automatch:
+  root_dir: artifacts_b/llm
+  database: IT_DISCOVERY
+  schema: CONSUMER_INT_MODEL
+  input_table: MPG_IT_AUTOMATCH_CANDIDATE_FEATURES_TEST
+  vacancy_search_table: *vac_t_search
+
+app:
+  root_dir: artifacts_b/app
+  database: IT_DISCOVERY
+  schema: CONSUMER_INT_MODEL
+  vacancy_table: MPG_IT_AUTOMATCH_JOBORDER_FEATURES_TEST
+  vacancy_search_table: *vac_t_search
+
+

@@ -44,6 +44,7 @@ class DataTransformationConfig:
     regions: list[str]
     turno_preferenza: dict
     parttime_preferenza_perc: list[int]
+    days_prior: int
 
 
 @dataclass(frozen=True)

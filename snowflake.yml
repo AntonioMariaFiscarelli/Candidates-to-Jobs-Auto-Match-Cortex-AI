@@ -7,7 +7,7 @@ entities:
     main_file: app_llm.py
     artifacts:
       - app_llm.py
-      - config/config.yaml
+      - config/config_dev.yaml
       - params.yaml
       - schema.yaml
       - src/*

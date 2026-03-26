@@ -3,8 +3,6 @@ import yaml
 from src.autoMatch import logger
 import json
 #from ensure import ensure_annotations
-#from box import ConfigBox
-#from box.exceptions import BoxValueError
 from src.autoMatch.utils.box.config_box import ConfigBox
 from src.autoMatch.utils.box.exceptions import BoxValueError
 from pathlib import Path
@@ -17,6 +15,7 @@ from snowflake.snowpark.types import StringType, BooleanType
 
 import math
 
+        
 #@ensure_annotations
 def read_yaml(path_to_yaml: Path) -> ConfigBox:
     """reads yaml file and returns
@@ -40,7 +39,29 @@ def read_yaml(path_to_yaml: Path) -> ConfigBox:
         raise ValueError("yaml file is empty")
     except Exception as e:
         raise e
+
     
+def read_yaml_sp(session, stage: str, path_to_yaml: Path)-> ConfigBox:
+
+    try:
+        cfg = yaml.safe_load(session.file.get_stream(f"@{stage}/{path_to_yaml.name}"))
+        """
+        df = session.create_dataframe(
+            [(path_to_yaml.name, yaml.dump(cfg))],
+            schema=["file_name", "yaml_text"]
+        )
+
+        df.write.mode("append").save_as_table("CONFIG_RAW")
+        """
+    except BoxValueError:
+        raise ValueError("YAML file is empty")
+    except Exception as e:
+        raise e
+
+    return ConfigBox(cfg)
+
+
+
 
 
 #@ensure_annotations
@@ -133,6 +154,15 @@ def get_size(path: Path) -> str:
 
 #@ensure_annotations
 def validate_string(df, column_name):
+    """Validates a string column of a dataframe. Sets it to None if null, empty, contains keyqords such as "null", "none", "nan".
+
+    Args:
+        df (DataFrame): dataframe
+        column_name (string): column to validate
+
+    Returns:
+        df: dataframe
+    """
     df = df.with_column(
         column_name,
         when(
@@ -145,7 +175,15 @@ def validate_string(df, column_name):
     return df
 
 def validate_json(df, json_column):
-    
+    """Validates a column of a dataframe containing a json in string format. Ensures correctness of the string and safely converts the string to a json object
+
+    Args:
+        df (DataFrame): dataframe
+        json_column (string): column to validate and convert to json
+
+    Returns:
+        df: dataframe
+    """
     def build_clean_parsing_udf():
         def clean(x: str) -> str:
             if x is None:
@@ -184,18 +222,40 @@ def validate_json(df, json_column):
     df = df.filter(col("is_valid_json") == True)
     df = df.drop("is_valid_json")
 
-    df = df.with_column(json_column, parse_json(col(json_column)))
-
+    #df = df.with_column(json_column, parse_json(col(json_column)))
+    from snowflake.snowpark.functions import call_function
+    df = df.with_column(
+        json_column,
+        call_function("TRY_PARSE_JSON", col(json_column))
+    )
+    
     df = df.filter(df[json_column].is_not_null())
 
     return df
 
 #@ensure_annotations
 def is_valid_number(x):
-    return isinstance(x, (int, float)) and not math.isnan(x)
+    """Returns true if x is a number, otherwise False
+
+    Args:
+        x: variable to validate
+    Returns:
+        isNumber: boolean value
+    """
+    isNumber = isinstance(x, (int, float)) and not math.isnan(x)
+
+    return isNumber
 
 def haversine(lat_ref, lon_ref):
-    # --- Haversine distance calculation in Snowpark ---
+    """Given latitude and longitude values, computes haversine distance between these coordinates and all coordinates in the dataframe
+
+    Args:
+        lat_ref: latitude
+        lon_ref: longitude
+
+    Returns:
+        distance_km: distance in kn between the point (lat_ref, lon_ref) and each point (latitude, longitude) of the dataframe
+    """
     lat1 = F.radians(F.lit(lat_ref))
     lon1 = F.radians(F.lit(lon_ref))
     lat2 = F.radians(F.col("LATITUDE"))

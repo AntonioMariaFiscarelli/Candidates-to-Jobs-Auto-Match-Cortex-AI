@@ -3,20 +3,23 @@ import streamlit as st
 import warnings
 #from src.autoMatch.utils.snowflake_utils import get_snowpark_session #use this locally
 #from snowflake.snowpark.context import get_active_session
-from src.autoMatch.utils.common import haversine
-from src.autoMatch.utils.common import is_valid_number
 import datetime
 
 from snowflake.snowpark import functions as F
-from snowflake.snowpark.functions import col, lit, concat, to_varchar, expr, count_distinct, lower, trim, array_size
+from snowflake.snowpark.functions import col, lit, lower, trim, to_varchar, count_distinct
+from snowflake.snowpark.functions import expr, array_size
 import re
 import ast
 
 from functools import reduce
 import operator
 
+from src.autoMatch.utils.common import haversine
+from src.autoMatch.utils.common import is_valid_number
+
 from src.autoMatch.config.configuration import ConfigurationManager
-from src.autoMatch.components.llm import LLM
+from src.autoMatch.components.automatch import Automatch
+
 
 
 
@@ -24,7 +27,6 @@ st.set_page_config(layout="wide")
 
 # Get the current credentials
 #session = get_active_session()
-import streamlit as st
 
 @st.cache_resource
 def get_snowpark_session_streamlit():
@@ -38,13 +40,12 @@ def get_snowpark_session_streamlit():
         return get_snowpark_session()
 
 
-
 @st.cache_resource
-def get_LLM():
+def get_Automatch():
     config = ConfigurationManager()
-    llm_config = config.get_llm_config()
-    llm = LLM(config=llm_config)
-    return llm
+    automatch_config = config.get_automatch_config()
+    automatch = Automatch(config=automatch_config)
+    return automatch
 
 @st.cache_resource
 def get_app_config():
@@ -53,14 +54,19 @@ def get_app_config():
     return app_config
 
 session = get_snowpark_session_streamlit()
-llm = get_LLM()
+automatch = get_Automatch()
 app_config=get_app_config()
 
-languages = [""] + llm.config.languages
-education_levels = [""] + llm.config.education_levels
-#desired_locations = [""] + llm.config.desired_locations
-turno_preferenza = [""] + llm.config.turno_preferenza
-parttime_preferenza_perc = [0] + llm.config.parttime_preferenza_perc 
+languages = [""] + automatch.config.languages
+education_levels = [""] + automatch.config.education_levels
+#desired_locations = [""] + automatch.config.desired_locations
+turno_preferenza = [""] + automatch.config.turno_preferenza
+parttime_preferenza_perc = [0] + automatch.config.parttime_preferenza_perc 
+
+if "vacancy" not in st.session_state:
+    st.session_state.vacancy = dict({"JOBORDER": "999999"})
+
+vacancy_temp_name = "VACANCY_APP_TEMP"
 
 
 def assign_if_not_none(key, value): 
@@ -117,29 +123,23 @@ def assign_list_if_not_none(key, value, allowed):
                 if cleaned:
                     st.session_state[key] = cleaned
 
-def reset_filters():
-    for key, value in app_config.default_inputs.items():
-        st.session_state[key] = value
-
 def set_default_values(vacancy_id):
-    #df_vacancy = llm.extract_vacancy_info(session, vacancy_id)
     df_vacancy = session.sql(f"""SELECT * FROM MPG_IT_AUTOMATCH_JOBORDER_FEATURES WHERE JOBORDERID = {vacancy_id}""")
-    #st.markdown("Valori estratti")
+    df_vacancy.write.save_as_table(vacancy_temp_name, mode="overwrite" )
     row = df_vacancy.first()
 
-    #AZZERA TUTTI I CAMPI DI INPUT
-
-    reset_filters()
+    reset_filters(vacancy=False)
     if row is None:
         st.warning("❌ Vacancy non trovata. Controllare l'ID inserito.")
+        st.session_state.vacancy = None
     else:
-        #st.markdown("✅ Vacancy trovata. Imposto i valori di default in base ai dati estratti.")
         data = row.as_dict()
+        st.session_state.vacancy = data
 
         assign_if_not_none("role", data.get("JOBTITLE"))
         assign_if_not_none("location", data.get("LOCATION"))
-        assign_if_not_none("region", data.get("LOCATION"))
-        assign_if_not_none("country", data.get("LOCATION"))
+        assign_if_not_none("region", data.get("REGION"))
+        assign_if_not_none("country", data.get("COUNTRY"))
 
         assign_if_not_none("max_ral", data.get("SALARY_LOW"))
         assign_if_not_none("date_available", data.get("DATE_AVAILABLE"))
@@ -151,52 +151,107 @@ def set_default_values(vacancy_id):
         assign_list_if_not_none("skills_languages_opt", data.get("LANGUAGES"), languages)
         assign_string_if_not_none("skills_education_opt", data.get("EDUCATION"), education_levels)
         assign_if_not_none("skills_certifications_opt", data.get("CERTIFICATIONS"))
-        #st.markdown("✅ Valori impostati correttamente dai dati della vacancy.")
+
+
+def update_vacancy_from_inputs():
+    """
+    Update st.session_state.vacancy with the values currently inserted
+    by the recruiter in the Streamlit input widgets.
+    """
+
+    # If no vacancy loaded, nothing to update
+    #if "vacancy" not in st.session_state or st.session_state.vacancy is None:
+    #    return
+
+    vac = st.session_state.vacancy
+
+    def list_to_string(value):
+        if isinstance(value, list):
+            return ", ".join(value) if value else None   # empty list → None
+        if isinstance(value, str):
+            if(value == ""):
+                return None
+        if value is None:
+            return None
+        return value
+
+    vac["JOBTITLE"] = list_to_string(st.session_state.get("role"))
+    vac["LOCATION"] = list_to_string(st.session_state.get("location"))
+    vac["REGION"] = list_to_string(st.session_state.get("region"))
+    vac["COUNTRY"] = list_to_string(st.session_state.get("country"))
+
+    vac["SALARY_LOW"] = st.session_state.get("max_ral")
+    vac["DATE_AVAILABLE"] = st.session_state.get("date_available")
+    vac["PARTTIME_PREFERENZA_PERC"] = st.session_state.get("parttime_preferenza_perc")
+
+    # --- LIST FIELDS ---
+    vac["TURNO_PREFERENZA"] = list_to_string(st.session_state.get("turno_preferenza"))
+    vac["LANGUAGES"] = list_to_string(st.session_state.get("skills_languages_opt"))
+
+    # --- STRING FIELDS ---
+    vac["EDUCATION"] = list_to_string(st.session_state.get("skills_education_opt"))
+    vac["CERTIFICATIONS"] = list_to_string(st.session_state.get("skills_certifications_opt"))
+
+    # --- FREE TEXT FIELDS ---
+    vac["SKILLS"] = list_to_string(st.session_state.get("skills_opt"))
+
+    session.create_dataframe([vac]).write.save_as_table(
+        vacancy_temp_name,
+        mode="overwrite",
+        #table_type="temporary"
+    )
+
+    # Save back into session_state
+    st.session_state.vacancy = vac
+
+
+def reset_filters(vacancy=True):
+    for key, value in app_config.default_inputs.items():
+        if(not "vacancy_id_raw" in key or vacancy):
+            st.session_state[key] = value
+
+def init_reset_inputs():
+    reset = st.button("Reset filtri", on_click=reset_filters)
+
+
+def search():
+    vacancy_id = st.session_state.vacancy_id_raw
+    with st.spinner("Recupero vacancy ed estrazione campi..."):
+        #if st.session_state.get("vacancy_id_raw"):
+            numeric_value = re.sub(r"\D", "", st.session_state.vacancy_id_raw)
+            #st.session_state.vacancy_id = numeric_value
+            if numeric_value:
+                set_default_values(numeric_value)
+            else:
+                st.warning("Inserire un vacancy ID valido.")
+        #else:
+        #    st.warning("Inserire un vacancy ID valido.")
 
 def init_vacancy_input():
-    col1, col2, col3 = st.columns([1, 1, 1])   # wider input, narrower button
+    col1, col2 = st.columns([1, 1])  
 
     with col1:
         st.text_input(
             "Inserire vacancy ID",
             key="vacancy_id_raw",
-            help="Inserire vacancy ID per l'estrazione automatica di feature"
+            help="Inserire vacancy ID per l'estrazione automatica di feature",
         )
 
     with col2:
         st.write("") 
         st.write("")
-        search = st.button("Cerca vacancy e imposta valori di default")
-    with col3:
-        st.write("") 
-        st.write("")
-        reset = st.button("Reset filtri")
+        st.button("Cerca per vacancy ID", on_click=search)
     
-    if reset:
-        reset_filters()
-        st.experimental_rerun()
-    
-    if search:
-        with st.spinner("Recupero vacancy ed estrazione campi..."):
-            if st.session_state.get("vacancy_id_raw"):
-                numeric_value = re.sub(r"\D", "", st.session_state.vacancy_id_raw)
-                st.session_state.vacancy_id = numeric_value
-                if st.session_state.vacancy_id:
-                    set_default_values(numeric_value)
-                else:
-                    st.warning("Inserire un vacancy ID valido.")
-            else:
-                st.warning("Inserire un vacancy ID valido.")
+
 
 
 def init_role_loc_dist_age_input():
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        st.text_input("Ruolo ricercato", 
+        st.text_input("Mansione", 
                     #value="Magazziniere", 
                     key="role",
-                    on_change=lambda: None,
                     help="Esempio: Magazziniere")
 
     with col2:
@@ -306,7 +361,7 @@ def init_skills_input():
     col1, col2 = st.columns(2)
     with col1:
         st.text_area(
-            "Skills tecniche essenziali (separate da virgola)",
+            "Skills tecniche obbligatorie (separate da virgola)",
             value="",#"Muletto",
             key="skills_mand",
             help="""Esempio: muletto, pacchetto office, gestionale inventario. 
@@ -316,7 +371,7 @@ def init_skills_input():
     # metti la seconda text_area nella seconda colonna
     with col2:
         st.text_area(
-            "Skills tecniche bonus (separate da virgola)",
+            "Skills tecniche facoltative (separate da virgola)",
             #value="",#"Excel",
             key="skills_opt",
             help="""Esempio: muletto, pacchetto office, gestionale inventario. 
@@ -341,7 +396,7 @@ def init_skills_languages_input():
 
     with col2:
         st.multiselect(
-            "Seleziona lingue bonus",
+            "Seleziona lingue facoltative",
             options=languages,
             key="skills_languages_opt",
             help="""Un bonus sarà assegnato per ogni lingua conosciuta dal candidato tra quelle richieste"""
@@ -366,7 +421,7 @@ def init_skills_education_input():
         )
     with col2:
         st.selectbox(
-            "Seleziona titolo di studio bonus",
+            "Seleziona titolo di studio facoltativo",
             options=education_levels,
             key="skills_education_opt",
             help="Un bonus sarà assegnato per ogni titolo di studio del candidato che risulti superiore a quello richiesto"
@@ -379,7 +434,7 @@ def init_skills_certifications_input():
     col1, col2 = st.columns(2)
     with col1:
         st.text_area(
-            "Certificazioni essenziali (separate da virgola)",
+            "Certificazioni obbligatorie (separate da virgola)",
             value="",#"Muletto",
             key="skills_certifications_mand",
             help="""Esempio: patente B, ECTL. 
@@ -388,7 +443,7 @@ def init_skills_certifications_input():
 
     with col2:
         st.text_area(
-            "Certificazioni bonus (separate da virgola)",
+            "Certificazioni facoltative (separate da virgola)",
             value="",#"Excel",
             key="skills_certifications_opt",
             help="""Esempio: patente B, ECTL. 
@@ -455,7 +510,9 @@ def filter_candidates():
 
     df_candidates = session.table(f"{db}.{schema}.{table}")
 
-    provinces = ['Foggia', 'Bari', 'Andria', 'Trani', 'BAT', 'Barletta-Andria-Trani', 'Taranto', 'Lecce', 'Brindisi']
+    provinces = ['Foggia', 'Bari', 'Andria', 'Trani', 'BAT', 'Barletta-Andria-Trani', 'Taranto', 'Lecce', 'Brindisi',
+                 'Ferrara', 'Forlì-Cesena', 'Modena', 'Parma', 'Piacenza', 'Ravenna', 'Reggio Emilia', 'Rimini']
+    
     provinces = [p.lower() for p in provinces]
     df_candidates = df_candidates.filter(lower(col("PROVINCE_EXT")).isin(provinces))
 
@@ -609,15 +666,15 @@ def filter_candidates():
         
 
     # Skills filter
-    if(False):
-        if st.session_state.skills.strip():
-            skills_list = [s.strip().lower() for s in st.session_state.skills.split(",")]
+    if(True):
+        if st.session_state.skills_mand.strip():
+            skills_list = [s.strip().lower() for s in st.session_state.skills_mand.split(",")]
             for skill in skills_list:
                 df_candidates = df_candidates.filter(lower(col("SKILLS")).like(f"%{skill}%"))
 
         # Skills filter
-        if st.session_state.skills_certifications_mand and st.session_state.skills_certifications.strip():
-            skills_list = [s.strip().lower() for s in st.session_state.skills_certifications.split(",")]
+        if st.session_state.skills_certifications_mand and st.session_state.skills_certifications_mand.strip():
+            skills_list = [s.strip().lower() for s in st.session_state.skills_certifications_mand.split(",")]
             for skill in skills_list:
                 df_candidates = df_candidates.filter(lower(col("CERTIFICATIONS")).like(f"%{skill}%"))
 
@@ -644,6 +701,9 @@ def filter_candidates():
 
 
 st.title("🔎 Automatch")
+
+init_reset_inputs()
+
 st.markdown("Inserisci l'ID della vacancy per definire automaticamente i criteri di ricerca")
 
 init_vacancy_input()
@@ -669,23 +729,24 @@ init_skills_certifications_input()
 if st.button("Cerca candidati"):
     with st.spinner("Recupero candidati e generazione ranking AI..."):
 
-        db = llm.config.database
-        schema = llm.config.schema
-        table = llm.config.input_table
+        db = automatch.config.database
+        schema = automatch.config.schema
+        table = automatch.config.input_table
 
-        columns = llm.config.columns  
+        columns = automatch.config.columns  
 
         df_candidates = filter_candidates()
 
-        #df_candidates.write.save_as_table(f"{db}.{schema}.{table}_APP", mode="overwrite")
+        update_vacancy_from_inputs()
+        #st.markdown(st.session_state.vacancy)
 
         # Count rows in the Snowpark DataFrame
-        candidate_count = df_candidates.count()
+        #candidate_count = df_candidates.count()
         
-        if candidate_count == 0:
-            st.warning("Nessun candidato trovato")
+        if df_candidates.limit(1).count() == 0:#candidate_count == 0:
+            st.warning("Nessun candidato trovato. Ridefinisci la ricerca")
         else:
-            prompts = llm.create_prompt_row(
+            prompts = automatch.create_prompt_row(
                 st.session_state.role,
                 st.session_state.skills_mand,
                 st.session_state.skills_opt,
@@ -707,17 +768,24 @@ if st.button("Cerca candidati"):
                         f"{pt}"
                         )
 
+            #st.markdown(f"{st.session_state.vacancy_id_raw}")
+            top_candidates = automatch.compute_score(session, df_candidates, st.session_state.vacancy_id_raw)
+            #top_candidates = automatch.call_ai_row(session, prompts, df_candidates)#.limit(100)
 
-            top_candidates = llm.call_ai_row(session, prompts, df_candidates)#.limit(100)
-
-            top_candidates = top_candidates.with_column("URL",concat(lit("https://cls70.bullhornstaffing.com/BullhornSTAFFING/OpenWindow.cfm?Entity=Candidate&id="),col("CANDIDATEID")))
-            top_candidates = top_candidates.sort(col("SCORE").desc())
+            print(f"top_candidates {top_candidates.shape}")
+            #top_candidates = top_candidates.with_column("URL",concat(lit("https://cls70.bullhornstaffing.com/BullhornSTAFFING/OpenWindow.cfm?Entity=Candidate&id="),col("CANDIDATEID")))
+            top_candidates["URL"] = (
+                "https://cls70.bullhornstaffing.com/BullhornSTAFFING/OpenWindow.cfm?Entity=Candidate&id="
+                + top_candidates["CANDIDATEID"].astype(str)
+            )
+            #top_candidates = top_candidates.sort(col("SCORE").desc())
 
             cols_default, cols = columns_to_show()
-            top_candidates = top_candidates.select(cols)
+            #top_candidates = top_candidates.select(cols)
+            cols = [s.upper() for s in cols_default]
+            top_candidates = top_candidates[cols]
 
 
-            top_candidates = top_candidates.to_pandas()
             top_candidates["AGE"] = top_candidates["AGE"].astype("Int64")
 
             if "TURNO_PREFERENZA" in top_candidates.columns:
@@ -728,6 +796,34 @@ if st.button("Cerca candidati"):
                     )
 
             top_candidates["URL"] = top_candidates["URL"].apply(lambda x: f"[Open Link]({x})")
+
+
+            rename_map = {
+                "SCORE": "Score",
+                "CANDIDATEID": "ID Candidato",
+                "FIRST_NAME": "Nome",
+                "LAST_NAME": "Cognome",
+                "LOCATION": "Location",
+                "URL": "URL",
+                "AGE": "Età",
+                "LAST_JOB": "Ultima mansione",
+                "SECOND_LAST_JOB": "Precedente mansione",
+                "THIRD_LAST_JOB": "Precedente mansione2",
+                "SKILLS": "Skills",
+                "EDUCATION": "Titolo di Studio",
+                "LANGUAGES": "Lingue",
+                "CERTIFICATIONS": "Certificazioni",
+                "SALARY_LOW": "RAL",
+                "DATE_AVAILABLE": "Disponibile da",
+                "TURNO_PREFERENZA": "Preferenza turno",
+                "SALARY_LOW": "RAL",
+                "PARTTIME_PREFERENZA_PERC": "Preferenza Part time %",
+
+            }
+
+            top_candidates = top_candidates.rename(columns=rename_map)
+
+            top_candidates.columns = [ col.replace(" ", "\u00A0") for col in top_candidates.columns ]
 
             st.markdown(
                 f"*Top candidates:*"

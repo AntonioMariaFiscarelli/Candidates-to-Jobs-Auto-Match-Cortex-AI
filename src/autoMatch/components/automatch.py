@@ -1,5 +1,5 @@
 from src.autoMatch import logger
-from src.autoMatch.entity.config_entity import LLMConfig
+from src.autoMatch.entity.config_entity import AutomatchConfig
 
 from snowflake.snowpark import functions as F
 from snowflake.snowpark.functions import col, lit, coalesce
@@ -14,9 +14,9 @@ from src.autoMatch.utils.common import validate_string
 import json
 import difflib
         
-class LLM:
+class Automatch:
 
-    def __init__(self, config: LLMConfig):
+    def __init__(self, config: AutomatchConfig):
         self.config = config
 
     def __normalize(self, s: str) -> str:
@@ -64,143 +64,6 @@ class LLM:
                         seen.add(term)
                         result.append(term)
         return result
-
-    def create_prompt_row(self, role, 
-                      skills, 
-                      skills_soft,
-                      skills_language,
-                      skills_education,
-                      skills_certifications):
-        """
-        Creates custom prompt based on potential candidates info and recruiter position info
-        Returns prompt in string format
-        """
-
-        role_mappings = self.config.role_mappings
-
-        similar_roles = self.__find_synonyms_builtin(role, role_mappings, cutoff=0.85)
-
-        if similar_roles:
-            role_mappings_string = f"{', '.join(similar_roles)}. "
-        else:
-            role_mappings_string = f"e ruoli simili"
-
-        skills_text = f"""Dai +1 punto per ogni skill che il candidato ha tra le seguenti : {skills}. 
-        (Ad esempio, se si ricerca la skill "SAP", si deve dare +1 a: "SAP", "software sap", "gestionale sap" ecc)
-        """ if bool(skills) else ""
-        languages_text = f"Dai un bonus ai candidati che conoscono le seguenti lingue: {', '.join(skills_language)}. " if bool(skills_language) else ""
-        education_text = f"Dai un bonus ai candidati che hanno questo titolo di studio o superiore: {skills_education}. " if bool(skills_education) else ""
-        certifications_text = f"Dai un bonus ai candidati che hanno le seguenti certificazioni: {skills_certifications}, anche se è all'interno di una lista di certificazioni. " if bool(skills_certifications) else ""
-
-
-        
-        prompt = f"""
-        Dai un voto al candidato per il seguente ruolo: {role} ({role_mappings_string}).
-        Dai sempre un voto più alto ai candidati i cui campi last_job, second_last_job o third_last_job contengono {role}, anche se all interno di una lista di ruoli.  
-        Dai un voto più alto ai candidati che hanno coperto più volte questo ruolo. 
-        Dai un voto più alto ai candidati che hanno coperto questo ruolo come last_job, rispetto a chi l ha coperto solo come second_last_job e third_last_job.
-        Dai un voto basso ai candidati che non hanno esperienza regressa in ruoli simili. 
-        Ad esempio 
-            - last_job:{role}, second_last_job:{role} e third_last_job:{role} -> voto 100.
-            - last_job:{role}, second_last_job:{role} e third_last_job:altro -> voto 85.
-            - last_job:{role}, second_last_job:altro e third_last_job:{role} -> voto 70.
-            - last_job:{role}, second_last_job:altro e third_last_job:altro -> voto 55.
-            - last_job:altro, second_last_job:{role} e third_last_job:{role} -> voto 40.
-            - last_job:altro, second_last_job:{role} e third_last_job:altro -> voto 25.
-            - last_job:altro, second_last_job:altro e third_last_job:{role} -> voto 10. 
-        {skills_text}
-        {languages_text}
-        {education_text}
-        {certifications_text}
-        Rispondi solo con un valore numerico da 0 a 100, dove 100 indica il candidato perfetto.
-        """
-
-        parts = [
-            "'Ultimo lavoro: ', last_job",
-            "'Penultimo lavoro: ', second_last_job",
-            "'Terzultimo lavoro: ', third_last_job"
-        ]
-
-        if skills_text:
-            parts.append("'Skills: ', skills")
-        if languages_text:
-            parts.append("'Languages: ', languages")
-        if education_text:
-            parts.append("'Education: ', education")
-        if certifications_text:
-            parts.append("'Certifications: ', certifications")
-
-        # unisci solo le parti presenti con " | "
-        text = ", ' | ', ".join(parts)
-        text = "CONCAT(" + text + ")"
-
-        #CONCAT('Ultimo lavoro: ', last_job, ' | Penultimo lavoro: ', second_last_job, ' | Terzultimo lavoro: ', third_last_job, ' | Skills: ', skills, ' | Languages: ', languages, ' | Education: ', education)
-
-
-        logger.info("Prompt successfully created")
-
-        return prompt, text 
-
-    def call_ai_row(self, session, prompt, text):
-        """
-        Calls AI model on custom prompt
-        Returns json response
-        """
-        llm_name = self.config.llm_name
-
-        database = self.config.database
-        schema = self.config.schema
-        input_table = self.config.input_table
-
-        query = f"""
-            SELECT
-                *,
-                SNOWFLAKE.CORTEX.COMPLETE(
-                    'claude-4-sonnet',
-                    CONCAT(
-                    '{prompt.replace("'", "''")}',
-                    'Testo: ', CONCAT('Ultimo lavoro: ', last_job, ' | Penultimo lavoro: ', second_last_job, ' | Terzultimo lavoro: ', third_last_job, 
-                    ' | Skills: ', skills, ' | Languages: ', languages, ' | Education: ', education)   
-                    )
-                ) AS SCORE
-            FROM 
-            (SELECT *
-            FROM {database}.{schema}.{input_table}_APP
-            --LIMIT 100
-            )
-            """
-        #CONCAT('Ultimo lavoro: ', last_job, ' | Penultimo lavoro: ', second_last_job, ' | Terzultimo lavoro: ', third_last_job
-        #CONCAT('Ultimo lavoro: ', last_job, ' | ', 'Penultimo lavoro: ', second_last_job, ' | ', 'Terzultimo lavoro: ', third_last_job)
-        query = f"""
-            SELECT
-                *,
-                SNOWFLAKE.CORTEX.COMPLETE(
-                    'claude-4-sonnet',
-                    CONCAT(
-                    '{prompt.replace("'", "''")}',
-                    'Testo: ', {text}
-                    )
-                ) AS SCORE
-            FROM 
-            (SELECT *
-            FROM {database}.{schema}.{input_table}_APP
-            --LIMIT 100
-            )
-            """
-        
-
-        logger.info(f"Running model {llm_name} on candidate data")
-
-        df = session.sql(query)
-
-        df = df.with_column(
-            "SCORE",
-            F.coalesce(F.try_cast(F.col("SCORE"), "int"), F.lit(0))
-        )
-
-        logger.info(f"Run completed")
-
-        return df
 
     def create_prompt_row(self, role, 
                       skills_mand, 
@@ -384,17 +247,16 @@ class LLM:
             'MAND_SKILLS': [prompt_skills_mand, 'skills'],
             'SCORE_SKILLS': [prompt_skills_opt, 'skills'],
             'MAND_LANGUAGES': [prompt_languages_mand, 'languages'],
-            'SCORE_LANGUAGES': [prompt_languages_opt, 'languages'],
+            #'SCORE_LANGUAGES': [prompt_languages_opt, 'languages'],
             'MAND_EDUCATION': [prompt_education_mand, 'education'],
-            'SCORE_EDUCATION': [prompt_education_opt, 'education'],
+            #'SCORE_EDUCATION': [prompt_education_opt, 'education'],
             'MAND_CERTIFICATIONS': [prompt_certifications_mand, 'certifications'],
-            'SCORE_CERTIFICATIONS': [prompt_certifications_opt, 'certifications']
+            #'SCORE_CERTIFICATIONS': [prompt_certifications_opt, 'certifications']
             }
 
         logger.info("Prompt successfully created")
 
-        return prompts
-    
+        return prompts  
 
     def call_ai_row(self, session, prompts, candidates_df):
         """
@@ -478,9 +340,206 @@ class LLM:
             df = df.with_column("SCORE", lit(0))
 
         df = df.filter(col("SCORE") > 0)
+        df = df.sort(col("SCORE").desc())
+
         logger.info(f"Run completed")
 
-        return df
+        return df.to_pandas()
+
+    def compute_score(self, session, candidates_df, joborderid):
+        import numpy as np
+        import pandas as pd
+        from snowflake.snowpark.functions import col, lit, call_function
+
+
+        database = self.config.database
+        schema = self.config.schema
+        input_table = self.config.input_table
+        vacancy_search_table = self.config.vacancy_search_table
+
+
+        # ---------------------------------------------------------
+        # 1. Load candidates from Snowflake
+        # ---------------------------------------------------------
+        candidates = candidates_df.to_pandas()
+
+        #for col in ["SKILLS_EMB", "LAST_JOB_EMB", "SECOND_LAST_JOB_EMB", "THIRD_LAST_JOB_EMB"]:
+        #    candidates = candidates[candidates[col].apply(lambda x: isinstance(x, list) and len(x) == 1024)]
+
+        # ---------------------------------------------------------
+        # 2. Load vacancy embeddings (1 row)
+        # ---------------------------------------------------------
+        vacancy = (
+            session.table(f"{database}.{schema}.{vacancy_search_table}")
+        )
+
+
+        ##############
+        cols_no_emb = [c for c in vacancy.columns if not c.lower().endswith("_emb")]
+        vacancy = vacancy.select([col(c) for c in cols_no_emb])
+
+        # 3. Clean text columns: replace NULL or '' with "Non disponibile"
+        vacancy = (
+            vacancy
+            .with_column(
+                "skills_clean",
+                when(col("skills").is_null() | (col("skills") == ""), lit("Non disponibile"))
+                .otherwise(col("skills"))
+            )
+            .with_column(
+                "jobtitle_clean",
+                when(col("jobtitle").is_null() | (col("jobtitle") == ""), lit("Non disponibile"))
+                .otherwise(col("jobtitle"))
+            )
+        )
+        # 4. Add new embeddings using Cortex
+        vacancy = (
+            vacancy
+            .with_column(
+                "skills_emb",
+                call_function(
+                    "SNOWFLAKE.CORTEX.AI_EMBED_1024",
+                    lit("multilingual-e5-large"),
+                    col("skills_clean")
+                )
+            )
+            .with_column(
+                "jobtitle_emb",
+                call_function(
+                    "SNOWFLAKE.CORTEX.AI_EMBED_1024",
+                    lit("multilingual-e5-large"),
+                    col("jobtitle_clean")
+                )
+            )
+        )
+
+        clean_cols = [c for c in vacancy.columns if c.lower().endswith("_clean")] 
+        vacancy = vacancy.drop(clean_cols)
+
+        ################
+
+        vacancy = (
+            vacancy
+            .select("skills_emb", "jobtitle_emb")
+            .to_pandas()
+            .iloc[0]
+        )
+        
+        skills_emb_vac = np.array(vacancy["SKILLS_EMB"])
+        jobtitle_emb_vac = np.array(vacancy["JOBTITLE_EMB"])
+
+        print("\nSKILLS EMB VAC")
+        print(skills_emb_vac.shape)
+        print("JOBTITLE EMB VAC")
+        print(jobtitle_emb_vac.shape)
+
+        # ---------------------------------------------------------
+        # 3. Convert candidate embeddings to NumPy matrices
+        # ---------------------------------------------------------
+        skills_mat = np.vstack(candidates["SKILLS_EMB"].apply(np.array).values)
+        last_job_mat = np.vstack(candidates["LAST_JOB_EMB"].apply(np.array).values)
+        second_last_mat = np.vstack(candidates["SECOND_LAST_JOB_EMB"].apply(np.array).values)
+        third_last_mat = np.vstack(candidates["THIRD_LAST_JOB_EMB"].apply(np.array).values)
+
+        print("\nCAND")
+        print(f"{skills_mat.shape} {last_job_mat.shape} {second_last_mat.shape} {third_last_mat.shape}")
+
+        # ---------------------------------------------------------
+        # 4. Fast cosine similarity (vectorized), normalized do [0, 1]
+        # ---------------------------------------------------------
+        def cosine_similarity_matrix(mat, vec):
+            vec_norm = np.linalg.norm(vec)
+            mat_norm = np.linalg.norm(mat, axis=1)
+            cos = (mat @ vec) / (mat_norm * vec_norm + 1e-9)
+            return cos#(cos-cos.min()) / (cos.max() - cos.min() + 1e-9)
+
+        
+        def minmax(x, xmin, xmax):
+            return (x - xmin) / (xmax - xmin + 1e-9)
+        
+
+        # ---------------------------------------------------------
+        # 5. Compute all similarities
+        # ---------------------------------------------------------
+
+
+        sim1 = cosine_similarity_matrix(last_job_mat, jobtitle_emb_vac)
+        sim2 = cosine_similarity_matrix(second_last_mat, jobtitle_emb_vac)
+        sim3 = cosine_similarity_matrix(third_last_mat, jobtitle_emb_vac)
+        sim4 = cosine_similarity_matrix(skills_mat, skills_emb_vac)
+
+        """
+        jmin = min(sim1.min(), sim2.min(), sim3.min())
+        jmax = min(sim1.max(), sim2.max(), sim3.max())
+
+        print(jmin, jmax)
+        sim1 = minmax(sim1, jmin, jmax)
+        sim2 = minmax(sim2, jmin, jmax)
+        sim3 = minmax(sim3, jmin, jmax)
+
+        jmin = np.min(sim4)
+        jmax = np.max(sim4)
+        sim4 = minmax(sim4, jmin, jmax)
+        print(jmin, jmax)
+        """ 
+
+        sim1 = minmax(sim1, sim1.min(), 1)#sim1.max())
+        sim2 = minmax(sim2, sim2.min(), 1)# sim2.max())
+        sim3 = minmax(sim3, sim3.min(), 1)# sim3.max())
+        sim4 = minmax(sim4, sim4.min(), 1)# sim4.max())
+
+        last_job_sim = sim1
+        second_last_sim = sim2
+        third_last_sim = sim3
+        skills_sim = sim4
+
+        print("\nSIM")
+        print(f"{skills_sim.shape} {last_job_sim.shape} {second_last_sim.shape} {third_last_sim.shape}")
+
+        # ---------------------------------------------------------
+        # 6. Weighted score
+        # ---------------------------------------------------------
+        score = (
+            50 * last_job_sim +
+            25 * second_last_sim +
+            15 * third_last_sim +
+            5 * skills_sim
+        )
+
+        # ---------------------------------------------------------
+        # 7. Build result DataFrame
+        # ---------------------------------------------------------
+        result = candidates.copy()
+        #result["skills_similarity"] = skills_sim
+        #result["last_job_similarity"] = last_job_sim
+        #result["second_last_job_similarity"] = second_last_sim
+        #result["third_last_job_similarity"] = third_last_sim
+        result["SCORE"] = score
+
+        print("\nRESULT")
+        print(result.shape)
+
+        # Filter and sort 
+        result_pdf = result[result["SCORE"] > 0] 
+        result_pdf = result_pdf.sort_values("SCORE", ascending=False) 
+        result_pdf["SCORE"] = result_pdf["SCORE"].round(0).astype(int)
+
+        print("\nRESULT PDF")
+        print(result_pdf.shape)
+        # --------------------------------------------------------- 
+        # # 8. Write back to Snowflake and return Snowpark DataFrame 
+        # # --------------------------------------------------------- 
+        """
+        temp_table = "TEMP_TOP_CANDIDATES" 
+        session.write_pandas( result_pdf, temp_table, auto_create_table=True, overwrite=True ) 
+        # Return a Snowflake DataFrame 
+        result_df = session.table(temp_table) 
+
+        print("\nRESULT DF")
+        print(result_df.count())
+        print(len(result_df.columns))
+        """
+        return result_pdf.head(100)
 
 
     def write_table(self, df, table_name = 'output_table'):

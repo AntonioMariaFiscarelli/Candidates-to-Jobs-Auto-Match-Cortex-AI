@@ -9,7 +9,7 @@ data_ingestion:
   output_table: MPG_IT_AUTOMATCH_CANDIDATE #_NEW
   output_table_vacancy: MPG_IT_AUTOMATCH_JOBORDER #_NEW
   italian_cities_file: italian_cities/italian_cities.xlsx
-  output_table_italian_cities : MPG_IT_AUTOMATCH_ITALIAN_CITIES
+  output_table_italian_cities: MPG_IT_AUTOMATCH_ITALIAN_CITIES
 
 data_validation:  
   root_dir: artifacts_b/data_validation
@@ -25,11 +25,17 @@ data_transformation:
   database: IT_DISCOVERY
   schema: CONSUMER_INT_MODEL
   input_table: MPG_IT_AUTOMATCH_CANDIDATE #_NEW
-  input_table_cleaned: MPG_IT_AUTOMATCH_CANDIDATE_CLEANED #_NEW
-  input_table_vacancy: MPG_IT_AUTOMATCH_JOBORDER #_NEW
+  input_table_cleaned: MPG_IT_AUTOMATCH_CANDIDATE_CLEANED #__NEW
+  input_table_vacancy: MPG_IT_AUTOMATCH_JOBORDER #__NEW
   input_table_italian_cities: MPG_IT_AUTOMATCH_ITALIAN_CITIES
-  output_table: MPG_IT_AUTOMATCH_CANDIDATE_FEATURES #_NEW
-  output_table_vacancy: MPG_IT_AUTOMATCH_JOBORDER_FEATURES #_NEW
+  output_table: MPG_IT_AUTOMATCH_CANDIDATE_FEATURES #__NEW
+  output_table_vacancy: MPG_IT_AUTOMATCH_JOBORDER_FEATURES #__NEW
+
+llm:
+  root_dir: artifacts_b/llm
+  database: IT_DISCOVERY
+  schema: CONSUMER_INT_MODEL
+  input_table: MPG_IT_AUTOMATCH_CANDIDATE_FEATURES #__NEW
 
 search_engine:
   root_dir: artifacts_b/search_engine
@@ -37,12 +43,6 @@ search_engine:
   schema: CONSUMER_INT_MODEL
   input_table: MPG_IT_AUTOMATCH_CANDIDATE_FEATURES #_NEW
   search_service: CANDIDATE_SEARCH_SERVICE
-
-llm:
-  root_dir: artifacts_b/llm
-  database: IT_DISCOVERY
-  schema: CONSUMER_INT_MODEL
-  input_table: MPG_IT_AUTOMATCH_CANDIDATE_FEATURES #_NEW
 
 app:
   root_dir: artifacts_b/app

@@ -81,7 +81,8 @@ class ConfigurationManager:
             education_levels = schema.education_levels,
             regions = schema.regions,
             turno_preferenza = schema.turno_preferenza,
-            parttime_preferenza_perc = schema.parttime_preferenza_perc
+            parttime_preferenza_perc = schema.parttime_preferenza_perc,
+            days_prior = schema.days_prior
         )
 
         return data_transformation_config
