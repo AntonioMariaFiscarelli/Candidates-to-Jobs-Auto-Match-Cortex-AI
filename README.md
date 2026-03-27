@@ -97,8 +97,8 @@ project/
 ```
 
 ## 📊 Example Use Case
-![Search](/app_screenshots/search.png)
-![Ranking](/app_screenshots/ranking.png)
+![Search](./app_screenshots/search.png)
+![Ranking](./app_screenshots/ranking.png)
 
 ## 📄 License
 This project is licensed under the MIT License.
