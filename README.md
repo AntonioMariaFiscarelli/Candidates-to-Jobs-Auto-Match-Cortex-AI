@@ -97,8 +97,8 @@ project/
 ```
 
 ## 📊 Example Use Case
-![Streamlit UI](app_screenshots/search.png)
-![Streamlit UI](app_screenshots/ranking.png)
+![Search](https://github.com/AntonioMariaFiscarelli/Candidates-to-Jobs-Auto-Match-Cortex-AI/blob/main/app_screenshots/search.png)
+![Ranking](https://github.com/AntonioMariaFiscarelli/Candidates-to-Jobs-Auto-Match-Cortex-AI/blob/main/app_screenshots/ranking.png)
 
 ## 📄 License
 This project is licensed under the MIT License.
