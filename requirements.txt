@@ -19,7 +19,7 @@ holoviews==1.18.3
 hvplot==0.9.1
 jupyter_bokeh==3.0.7
 
-# Jupyter support (optional but allowed)
+# Jupyter support
 notebook
 ipykernel
 

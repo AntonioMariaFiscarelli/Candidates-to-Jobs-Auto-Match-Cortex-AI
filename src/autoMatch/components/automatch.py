@@ -88,19 +88,18 @@ class Automatch:
         columns: candidate column(s) name (or combination) provided to Cortex AI
         """
 
-        role_mappings = self.config.role_mappings
-
-        # Looks up for similar roles to the one specified. i.e. "Magazziniere" will also include "carico scarico" and "warehouse worker"
-        similar_roles = self.__find_synonyms_builtin(role, role_mappings, cutoff=0.85)
-
-        if similar_roles:
-            role_mappings_string = f"{', '.join(similar_roles)}. "
-        else:
-            role_mappings_string = f"e ruoli simili"
-
+        
+        #role_mappings = self.config.role_mappings
+        ## Looks up for similar roles to the one specified. i.e. "Magazziniere" will also include "carico scarico" and "warehouse worker"
+        #similar_roles = self.__find_synonyms_builtin(role, role_mappings, cutoff=0.85)
+        #if similar_roles:
+        #    role_mappings_string = f"{', '.join(similar_roles)}. "
+        #else:
+        #    role_mappings_string = f"e ruoli simili"
+        ## Dai un voto al candidato per il seguente ruolo: {role} ({role_mappings_string}).
         
         prompt_jobs = f"""
-        Dai un voto al candidato per il seguente ruolo: {role} ({role_mappings_string}).
+        Dai un voto al candidato per il seguente ruolo: {role}.
         Dai sempre un voto più alto ai candidati i cui campi last_job, second_last_job o third_last_job contengono {role}, anche se all interno di una lista di ruoli.  
         Dai un voto più alto ai candidati che hanno coperto più volte questo ruolo. 
         Dai un voto più alto ai candidati che hanno coperto questo ruolo come last_job, rispetto a chi l ha coperto solo come second_last_job e third_last_job.

@@ -1,21 +1,15 @@
 # Import python packages
 import streamlit as st
-import warnings
-#from src.autoMatch.utils.snowflake_utils import get_snowpark_session #use this locally
-#from snowflake.snowpark.context import get_active_session
 import datetime
 
-from snowflake.snowpark import functions as F
 from snowflake.snowpark.functions import col, lit, lower, trim, to_varchar, count_distinct
 from snowflake.snowpark.functions import expr, array_size
 import re
 import ast
-
 from functools import reduce
 import operator
 
-from src.autoMatch.utils.common import haversine
-from src.autoMatch.utils.common import is_valid_number
+from src.autoMatch.utils.common import haversine, is_valid_number
 
 from src.autoMatch.config.configuration import ConfigurationManager
 from src.autoMatch.components.automatch import Automatch
@@ -67,7 +61,6 @@ vacancy_temp_name = app_config.vacancy_search_table
 
 if "vacancy" not in st.session_state:
     st.session_state.vacancy = dict({"JOBORDER": "999999"})
-
 
 
 def assign_if_not_none(key, value): 
@@ -630,7 +623,6 @@ def filter_candidates():
         )
 
         # Keep only rows where turno_value is one of the selected values
-
         df_filtered = df_flat.filter(
             col("turno_value").isin(selected)
         )
@@ -658,10 +650,6 @@ def filter_candidates():
             (col("PARTTIME_PREFERENZA_PERC").is_null()) |
             (col("PARTTIME_PREFERENZA_PERC") == lit(0))
         )
-        if(False):
-            df_candidates = df_candidates.sort(
-                col("PARTTIME_PREFERENZA_PERC").is_null().asc()   # False (non-null) comes before True (null)
-            )
         
 
     if st.session_state.skills_mand.strip():
@@ -698,28 +686,21 @@ def filter_candidates():
 
 
 st.title("🔎 Automatch")
-
 init_reset_inputs()
-
 st.markdown("Inserisci l'ID della vacancy per definire automaticamente i criteri di ricerca")
-
 init_vacancy_input()
-
 st.subheader("Filtri di ricerca")
 st.markdown("Modifica i criteri di ricerca per trovare i candidati ideali.")
-
 
 init_role_loc_dist_age_input()
 st.write("")
 bullhorn_fields_input()
 st.write("")
 init_skills_input()
-#init_skills_soft_input()
 st.write("")
 init_skills_languages_input()
 init_skills_education_input()
 init_skills_certifications_input()
-#init_limit_input()
 
 
 
@@ -730,48 +711,34 @@ if st.button("Cerca candidati"):
         schema = automatch.config.schema
         table = automatch.config.input_table
 
-        columns = automatch.config.columns  
+        #columns = automatch.config.columns  
 
         df_candidates = filter_candidates()
 
         update_vacancy_from_inputs()
-        #st.markdown(st.session_state.vacancy)
 
-        # Count rows in the Snowpark DataFrame
-        #candidate_count = df_candidates.count()
         
-        if df_candidates.limit(1).count() == 0:#candidate_count == 0:
+        if df_candidates.limit(1).count() == 0:
             st.warning("Nessun candidato trovato. Ridefinisci la ricerca")
         else:
-            """
-            prompts = automatch.create_prompt_row(
-                st.session_state.role,
-                st.session_state.skills_mand,
-                st.session_state.skills_opt,
-                [], #st.session_state.skills_languages_mand,
-                st.session_state.skills_languages_opt,
-                [], #st.session_state.skills_education_mand,
-                st.session_state.skills_education_opt,
-                st.session_state.skills_certifications_mand,
-                st.session_state.skills_certifications_opt
-            )
-            
             if(False):
-                st.text(
-                    f"{prompt}"
-                    )
-                for key, (pt, field) in prompts.items():
-                    st.text(
-                        f"{pt}"
-                        )
-            """
+                prompts = automatch.create_prompt_row(
+                    st.session_state.role,
+                    st.session_state.skills_mand,
+                    st.session_state.skills_opt,
+                    [], #st.session_state.skills_languages_mand,
+                    st.session_state.skills_languages_opt,
+                    [], #st.session_state.skills_education_mand,
+                    st.session_state.skills_education_opt,
+                    st.session_state.skills_certifications_mand,
+                    st.session_state.skills_certifications_opt
+                )
+            
 
-            #st.markdown(f"{st.session_state.vacancy_id_raw}")
+
             top_candidates = automatch.compute_score(session, df_candidates, st.session_state.vacancy_id_raw)
-            #top_candidates = automatch.call_ai_row(session, prompts, df_candidates)#.limit(100)
 
-            #print(f"top_candidates {top_candidates.shape}")
-            #top_candidates = top_candidates.with_column("URL",concat(lit("https://cls70.bullhornstaffing.com/BullhornSTAFFING/OpenWindow.cfm?Entity=Candidate&id="),col("CANDIDATEID")))
+
             top_candidates["URL"] = (
                 "https://cls70.bullhornstaffing.com/BullhornSTAFFING/OpenWindow.cfm?Entity=Candidate&id="
                 + top_candidates["CANDIDATEID"].astype(str)
@@ -779,7 +746,6 @@ if st.button("Cerca candidati"):
             #top_candidates = top_candidates.sort(col("SCORE").desc())
 
             cols_default, cols = columns_to_show()
-            #top_candidates = top_candidates.select(cols)
             cols = [s.upper() for s in cols_default]
             top_candidates = top_candidates[cols]
 
@@ -794,7 +760,6 @@ if st.button("Cerca candidati"):
                     )
 
             top_candidates["URL"] = top_candidates["URL"].apply(lambda x: f"[Open Link]({x})")
-
 
             rename_map = {
                 "SCORE": "Score",
@@ -820,7 +785,6 @@ if st.button("Cerca candidati"):
             }
 
             top_candidates = top_candidates.rename(columns=rename_map)
-
             top_candidates.columns = [ col.replace(" ", "\u00A0") for col in top_candidates.columns ]
 
             st.markdown(

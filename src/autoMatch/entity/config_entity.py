@@ -115,7 +115,7 @@ class AutomatchConfig:
     columns : dict
     llm_model : str
     columns: dict
-    role_mappings: dict
+    #role_mappings: dict
     languages: list[str]
     education_levels : dict
     desired_locations: dict

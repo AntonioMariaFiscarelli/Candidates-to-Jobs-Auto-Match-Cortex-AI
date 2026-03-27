@@ -158,7 +158,7 @@ class ConfigurationManager:
             vacancy_search_table=config.vacancy_search_table,
             llm_model=params.llm_model,
             columns=schema.columns,
-            role_mappings = schema.role_mappings,
+            #role_mappings = schema.role_mappings,
             languages = schema.languages,
             education_levels = schema.education_levels,
             desired_locations = schema.desired_locations,
