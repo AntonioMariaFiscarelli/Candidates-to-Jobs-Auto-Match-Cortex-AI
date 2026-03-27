@@ -13,7 +13,7 @@ It also implements an automatching engine that matches candidates to relevant jo
 - **Streamlit app for automatch**: The Streamlit app allows recruiters, with a single click, to match a vacancy with all candidates and obtain a ranked list based on their fit.  
     - ***Streamlit UI***: Provides an interactive front-end for entering queries, selecting filters, and viewing ranked results.  
     - ***Structured Filtering***: Supports hard filters such as location, age, availability, and salary.  
-    - ***Cortex Search Service***: Matches candidates to jobs based on CV content and job descriptions.  
+    - ***Automatch Service***: Matches candidates to jobs based on CV content and job descriptions.  
     - ***Snowpark Integration***: Executes SQL and Python logic inside Snowflake for efficient data processing.
 
 
@@ -41,13 +41,13 @@ SNOWFLAKE_WAREHOUSE=your_warehouse_name
 python main.py
 ```
 
-4. **Run the Stramlit app**
+5. **Run the Streamlit app**
 ```bash
 streamlit run app.py
 ```
 
 ## 📂 Project Structure
-
+```bash
 project/
 ├── config/
 │   └── config_dev.yaml
@@ -94,20 +94,11 @@ project/
 └── main.py
 └── app.py
 └── README.md
+```
 
+## 📊 Example Use Case
+![Streamlit UI](app_screenshots/search.png)
+![Streamlit UI](app_screenshots/ranking.png)
 
-📊 Example Use Case
-<p align="center">
-  <img src="app_screenshots/vacancy_search.png" width="700"/>
-</p>
-<p align="center">
-  <img src="app_screenshots/candidate_ranking.png" width="700"/>
-</p>
-
-
-
-📄 License
+## 📄 License
 This project is licensed under the MIT License.
-
-🤝 Contributing
-Feel free to fork the repository, submit issues, or open pull requests to improve functionality or add new features.
